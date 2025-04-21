@@ -221,83 +221,209 @@ class SolidWorksAnalyzer:
     def __init__(self):
         self.parser = SWFileParser()
         self.binary_cache = {}  # Binary veri önbelleği
+        self.weights = {
+            'metadata': 0.25,
+            'hash': 0.15,
+            'content': 0.30,
+            'structure': 0.30
+        }
 
-    def _check_assembly_relations(self, file_path):
-        """Dosyanın montaj ilişkilerini kontrol eder"""
+    def _check_assembly_relation(self, file1, file2):
+        """Montaj ilişkisi kontrolü"""
+        try:
+            asm1 = self._get_assembly_info(file1)
+            asm2 = self._get_assembly_info(file2)
+
+            # Ortak referansları bul
+            common_refs = set(asm1['references']) & set(asm2['references'])
+
+            return {
+                'same_assembly': len(common_refs) > 0,
+                'assembly_name': list(common_refs)[0] if common_refs else None,
+                'common_refs': list(common_refs)
+            }
+        except Exception as e:
+            logging.error(f"Montaj ilişkisi kontrolü hatası: {e}")
+            return {'same_assembly': False, 'assembly_name': None, 'common_refs': []}
+
+    def _get_assembly_info(self, file_path):
+        """Dosyanın montaj bilgilerini al"""
         try:
             # Montaj referanslarını bul
             assembly_refs = self.parser.get_assembly_references(file_path)
 
             # Montaj içi parça mı?
             is_in_assembly = len(assembly_refs) > 0
+            assembly_id = hashlib.md5(str(assembly_refs).encode()).hexdigest() if assembly_refs else None
 
             return {
                 'is_in_assembly': is_in_assembly,
-                'references': assembly_refs
+                'references': assembly_refs,
+                'assembly_id': assembly_id,
+                'assembly_name': assembly_refs[0] if assembly_refs else None
             }
         except Exception as e:
-            logging.error(f"Montaj ilişkileri kontrol hatası: {e}")
-            return {'is_in_assembly': False, 'references': []}
+            logging.error(f"Montaj bilgisi alma hatası: {e}")
+            return {'is_in_assembly': False, 'references': [], 'assembly_id': None, 'assembly_name': None}
 
     def compare(self, file1, file2):
         """İki SolidWorks dosyasını karşılaştırır"""
         try:
-            # Montaj ilişkilerini kontrol et
-            asm1 = self._check_assembly_relations(file1)
-            asm2 = self._check_assembly_relations(file2)
+            # Montaj kontrolü
+            asm_info = self._check_assembly_relation(file1, file2)
 
-            # Hash kontrolü (birebir aynı dosyalar için)
+            # Hash kontrolü
             if self._compare_hash(file1, file2):
-                return self._create_perfect_match()
+                return self._create_exact_match()
 
             # Binary karşılaştırma
             binary_sim = self._compare_binary(file1, file2)
             if binary_sim > 0.995:  # %99.5 üzeri benzerlik
-                return self._create_perfect_match()
+                return self._create_exact_match()
 
             # Detaylı analiz
             data1 = self.parser.parse_features(file1)
             data2 = self.parser.parse_features(file2)
 
+            # Temel karşılaştırmalar
+            metadata_sim = self._compare_metadata(file1, file2)
+            content_sim = self._compare_content(data1, data2)
+            structure_sim = self._compare_structure(data1, data2)
+
             # SaveAs kontrolü
-            if self._is_save_as_copy(file1, file2, data1, data2):
+            if self._is_save_as(metadata_sim, content_sim, structure_sim):
                 return self._create_save_as_match()
 
-            # Feature analizi
-            feature_sim = self._compare_features(data1['features'], data2['features'])
-            sketch_sim = self._compare_sketches(data1['sketches'], data2['sketches'])
-            geom_sim = self._compare_geometry(data1['geometry_stats'], data2['geometry_stats'])
+            # Montaj bonusu
+            if asm_info['same_assembly']:
+                structure_sim *= 1.2  # %20 bonus
+                content_sim *= 1.1    # %10 bonus
 
-            # Sonuç hesaplama
-            result = self._calculate_final_score(feature_sim, sketch_sim, geom_sim)
-            result['type'] = 'solidworks'  # Tip bilgisini ekle
-            result['size_similarity'] = min(os.path.getsize(file1), os.path.getsize(file2)) / \
-                                      max(os.path.getsize(file1), os.path.getsize(file2)) * 100
+                # Montaj bilgilerini sonuç sözlüğüne ekle
+                assembly_bonus = {
+                    'structure_bonus': 20,
+                    'content_bonus': 10,
+                    'assembly_name': asm_info['assembly_name'],
+                    'common_refs': asm_info['common_refs']
+                }
 
-            # Aynı montajdan gelen parçalar için benzerlik skorunu artır
-            assembly_bonus = 0
-            if asm1['is_in_assembly'] and asm2['is_in_assembly']:
-                # Ortak referansları bul
-                common_refs = set(asm1['references']) & set(asm2['references'])
-                if common_refs:  # Ortak referanslar varsa
-                    assembly_bonus = 10  # %10 bonus
-                    # Montaj bilgilerini sonuç sözlüğüne ekle
-                    result['assembly_relation'] = {
-                        'common_refs': list(common_refs),
-                        'bonus': assembly_bonus
-                    }
+            # Final skor hesaplama
+            total_score = (
+                metadata_sim * self.weights['metadata'] +
+                content_sim * self.weights['content'] +
+                structure_sim * self.weights['structure']
+            )
 
-            # Montaj bonusunu ekle
-            if assembly_bonus > 0:
-                result['score'] = min(100, result['score'] + assembly_bonus)
-                # Detay bilgilerini güncelle
-                result['details']['assembly_bonus'] = assembly_bonus
+            result = {
+                'score': min(100, total_score),  # 100'den büyük olamaz
+                'details': {
+                    'feature_tree': structure_sim,
+                    'sketch_data': content_sim,
+                    'geometry': metadata_sim
+                },
+                'match': total_score > 95,
+                'type': 'solidworks',
+                'size_similarity': min(os.path.getsize(file1), os.path.getsize(file2)) / \
+                                  max(os.path.getsize(file1), os.path.getsize(file2)) * 100
+            }
+
+            # Montaj bilgilerini ekle
+            if asm_info['same_assembly']:
+                result['assembly_relation'] = assembly_bonus
 
             return result
 
         except Exception as e:
             logging.error(f"SolidWorks karşılaştırma hatası: {e}")
             return self._create_error_result()
+
+    def _compare_metadata(self, file1, file2):
+        """Metadata karşılaştırması"""
+        try:
+            # Dosya boyutu karşılaştırması
+            size1 = os.path.getsize(file1)
+            size2 = os.path.getsize(file2)
+            size_ratio = min(size1, size2) / max(size1, size2) if max(size1, size2) > 0 else 0
+            size_similarity = size_ratio * 100
+
+            # Zaman damgası karşılaştırması
+            stat1 = os.stat(file1)
+            stat2 = os.stat(file2)
+            time_diff = abs(stat1.st_mtime - stat2.st_mtime)
+            time_similarity = max(0, 100 - (time_diff / 86400 * 100)) if time_diff < 86400 else 0
+
+            # Ağırlıklı metadata benzerliği
+            return size_similarity * 0.8 + time_similarity * 0.2
+        except Exception as e:
+            logging.error(f"Metadata karşılaştırma hatası: {e}")
+            return 0.0
+
+    def _compare_content(self, data1, data2):
+        """İçerik karşılaştırması"""
+        try:
+            # Sketch karşılaştırması
+            sketch_sim = self._compare_sketches(data1['sketches'], data2['sketches'])
+
+            # Geometri karşılaştırması
+            geom_sim = self._compare_geometry(data1['geometry_stats'], data2['geometry_stats'])
+
+            # Ağırlıklı içerik benzerliği
+            return sketch_sim * 0.4 + geom_sim * 0.6
+        except Exception as e:
+            logging.error(f"İçerik karşılaştırma hatası: {e}")
+            return 0.0
+
+    def _compare_structure(self, data1, data2):
+        """Yapı karşılaştırması"""
+        try:
+            # Feature ağacı karşılaştırması
+            feature_sim = self._compare_features(data1['features'], data2['features'])
+
+            # Feature sayısı karşılaştırması
+            count_sim = min(len(data1['features']), len(data2['features'])) / \
+                        max(len(data1['features']), len(data2['features'])) * 100 if max(len(data1['features']), len(data2['features'])) > 0 else 0
+
+            # Ağırlıklı yapı benzerliği
+            return feature_sim * 0.7 + count_sim * 0.3
+        except Exception as e:
+            logging.error(f"Yapı karşılaştırma hatası: {e}")
+            return 0.0
+
+    def _is_save_as(self, metadata_sim, content_sim, structure_sim):
+        """SaveAs kontrolü"""
+        return (
+            metadata_sim > 90 and    # Metadata çok benzer
+            content_sim > 50 and     # İçerik benzer
+            structure_sim > 40       # Yapı benzer
+        )
+
+    def _is_save_as_copy(self, file1, file2, data1, data2):
+        """SaveAs kontrolü - Gelişmiş versiyon"""
+        try:
+            # Metadata kontrolü
+            size_ratio = min(os.path.getsize(file1), os.path.getsize(file2)) / \
+                        max(os.path.getsize(file1), os.path.getsize(file2))
+
+            # Feature kontrolü
+            feature_match = self._compare_features(data1['features'], data2['features'])
+
+            # Geometri kontrolü
+            geom_sim = self._compare_geometry(data1['geometry_stats'], data2['geometry_stats'])
+
+            # Zaman damgası kontrolü
+            time_diff = abs(os.path.getmtime(file1) - os.path.getmtime(file2))
+            time_sim = 1.0 if time_diff < 3600 else 0.0  # 1 saat içinde
+
+            # SaveAs kriterleri
+            return (
+                size_ratio > 0.95 and     # Boyut çok benzer
+                feature_match > 70.0 and   # Feature yapısı benzer
+                geom_sim > 95.0 and       # Geometri neredeyse aynı
+                time_sim > 0.0            # Yakın zamanda oluşturulmuş
+            )
+        except Exception as e:
+            logging.error(f"SaveAs kontrolü hatası: {e}")
+            return False
 
     def _compare_hash(self, file1, file2):
         """Hash karşılaştırması"""
@@ -413,21 +539,20 @@ class SolidWorksAnalyzer:
     def _is_save_as_copy(self, file1, file2, data1, data2):
         """SaveAs kontrolü"""
         try:
-            # Boyut kontrolü
+            # Metadata kontrolü
             size_ratio = min(os.path.getsize(file1), os.path.getsize(file2)) / \
                         max(os.path.getsize(file1), os.path.getsize(file2))
 
-            # Feature sayısı kontrolü
-            feature_ratio = min(len(data1['features']), len(data2['features'])) / \
-                          max(len(data1['features']), len(data2['features'])) if max(len(data1['features']), len(data2['features'])) > 0 else 0
+            # Feature kontrolü
+            feature_match = self._compare_features(data1['features'], data2['features'])
 
             # Geometri kontrolü
             geom_sim = self._compare_geometry(data1['geometry_stats'], data2['geometry_stats'])
 
-            # SaveAs kriterleri
-            return (size_ratio > 0.95 and
-                   feature_ratio > 0.95 and
-                   geom_sim > 90.0)
+            # SaveAs kriterleri güncellendi
+            return (size_ratio > 0.90 and  # Boyut benzerliği
+                    feature_match > 80.0 and  # Feature benzerliği
+                    geom_sim > 85.0)  # Geometri benzerliği
         except Exception as e:
             logging.error(f"SaveAs kontrolü hatası: {e}")
             return False
@@ -440,8 +565,11 @@ class SolidWorksAnalyzer:
         total_score = 0
         max_features = max(len(features1), len(features2))
 
+        # Feature eşleştirme matrisi
+        similarity_matrix = []
+
         for f1 in features1:
-            best_match = 0
+            row_scores = []
             for f2 in features2:
                 # İsim benzerliği
                 name_sim = difflib.SequenceMatcher(None, f1['name'], f2['name']).ratio()
@@ -449,12 +577,55 @@ class SolidWorksAnalyzer:
                 # Parametre benzerliği
                 param_sim = self._compare_parameters(f1.get('params', {}), f2.get('params', {}))
 
-                # Toplam benzerlik
-                similarity = (name_sim * 0.6 + param_sim * 0.4)
-                best_match = max(best_match, similarity)
+                # Konum benzerliği (ağaçtaki pozisyon)
+                position_sim = 1.0 - abs(features1.index(f1) - features2.index(f2)) / max_features if max_features > 0 else 0
 
-            total_score += best_match
+                # Ağırlıklı benzerlik skoru
+                similarity = (
+                    name_sim * 0.4 +      # İsim önemli
+                    param_sim * 0.4 +     # Parametreler önemli
+                    position_sim * 0.2    # Konum daha az önemli
+                )
+                row_scores.append(similarity)
 
+            similarity_matrix.append(row_scores)
+
+        # En iyi eşleşmeleri bul
+        matched_features = 0
+        while similarity_matrix and any(row for row in similarity_matrix if row):
+            # En yüksek benzerlik skorunu bul
+            best_row = -1
+            best_col = -1
+            best_score = -1
+
+            for i, row in enumerate(similarity_matrix):
+                if not row:  # Boş satırı atla
+                    continue
+
+                row_max = max(row)
+                row_max_idx = row.index(row_max)
+
+                if row_max > best_score:
+                    best_score = row_max
+                    best_row = i
+                    best_col = row_max_idx
+
+            if best_score < 0:  # Eşleşme bulunamadı
+                break
+
+            # Bulunan eşleşmeyi skora ekle
+            total_score += best_score
+            matched_features += 1
+
+            # Kullanılan satırı kaldır
+            similarity_matrix[best_row] = []
+
+            # Kullanılan sütunu kaldır
+            for row in similarity_matrix:
+                if row and best_col < len(row):
+                    row.pop(best_col)
+
+        # Toplam skoru hesapla
         return (total_score / max_features) * 100 if max_features > 0 else 0
 
     def _compare_parameters(self, params1, params2):
@@ -479,34 +650,103 @@ class SolidWorksAnalyzer:
 
         return matches / total_params if total_params > 0 else 0
 
+    def _compare_sketch_geometry(self, sketch1, sketch2):
+        """Sketch geometrilerini karşılaştır"""
+        try:
+            # Sketch türleri aynı değilse düşük benzerlik
+            if sketch1['type'] != sketch2['type']:
+                return 0.2  # Farklı türler için düşük benzerlik
+
+            # Offset değerlerinin benzerliği
+            offset_diff = abs(sketch1.get('offset', 0) - sketch2.get('offset', 0))
+            offset_sim = 1.0 / (1.0 + offset_diff / 1000.0)  # Offset farkı arttıkça benzerlik azalır
+
+            # Veri benzerliği
+            data_sim = 0.5  # Varsayılan orta benzerlik
+            if 'data' in sketch1 and 'data' in sketch2:
+                data_sim = difflib.SequenceMatcher(None, sketch1['data'], sketch2['data']).ratio()
+
+            # Ağırlıklı benzerlik
+            return offset_sim * 0.3 + data_sim * 0.7
+        except Exception as e:
+            logging.error(f"Sketch geometri karşılaştırma hatası: {e}")
+            return 0.3  # Hata durumunda düşük-orta benzerlik
+
     def _compare_sketches(self, sketches1, sketches2):
         """Sketch verilerini karşılaştır"""
         if not sketches1 or not sketches2:
             return 0.0
 
-        # Sketch tür dağılımı benzerliği
+        # Sketch tür dağılımı
         types1 = [s['type'] for s in sketches1]
         types2 = [s['type'] for s in sketches2]
 
-        # Tür sayılarını say
+        # Tür sayımı
         from collections import Counter
         count1 = Counter(types1)
         count2 = Counter(types2)
 
-        # Tüm türleri birleştir
+        # Tüm türler
         all_types = set(count1.keys()) | set(count2.keys())
-
-        # Benzerlik hesapla
         if not all_types:
             return 0.0
 
-        similarity = sum(min(count1.get(t, 0), count2.get(t, 0)) for t in all_types) / \
-                     sum(max(count1.get(t, 0), count2.get(t, 0)) for t in all_types)
+        # Tür benzerliği
+        type_similarity = sum(min(count1.get(t, 0), count2.get(t, 0)) for t in all_types) / \
+                         sum(max(count1.get(t, 0), count2.get(t, 0)) for t in all_types)
 
-        return similarity * 100
+        # Sketch detay analizi
+        detail_scores = []
+        for s1 in sketches1:
+            best_match = 0
+            for s2 in sketches2:
+                if s1['type'] == s2['type']:
+                    # Geometri karşılaştırması
+                    geom_sim = self._compare_sketch_geometry(s1, s2)
+                    # Parametre karşılaştırması
+                    param_sim = self._compare_parameters(s1.get('params', {}), s2.get('params', {}))
+
+                    similarity = (geom_sim * 0.7 + param_sim * 0.3)
+                    best_match = max(best_match, similarity)
+
+            if best_match > 0:
+                detail_scores.append(best_match)
+
+        detail_similarity = sum(detail_scores) / len(detail_scores) if detail_scores else 0
+
+        # Toplam benzerlik
+        return (type_similarity * 0.4 + detail_similarity * 0.6) * 100
+
+    def _compare_bounding_boxes(self, bbox1, bbox2):
+        """Bounding box karşılaştırması"""
+        try:
+            if not bbox1 or not bbox2:
+                return 0.0
+
+            # Boyut karşılaştırması
+            dims1 = [bbox1.get('width', 0), bbox1.get('height', 0), bbox1.get('depth', 0)]
+            dims2 = [bbox2.get('width', 0), bbox2.get('height', 0), bbox2.get('depth', 0)]
+
+            # Boyutları sırala (en büyük boyut her zaman ilk sırada olsun)
+            dims1.sort(reverse=True)
+            dims2.sort(reverse=True)
+
+            # Boyut oranlarını karşılaştır
+            dim_sims = []
+            for i in range(min(len(dims1), len(dims2))):
+                if dims1[i] > 0 and dims2[i] > 0:
+                    dim_sims.append(min(dims1[i], dims2[i]) / max(dims1[i], dims2[i]))
+                else:
+                    dim_sims.append(0.0)
+
+            # Ortalama boyut benzerliği
+            return sum(dim_sims) / len(dim_sims) if dim_sims else 0.0
+        except Exception as e:
+            logging.error(f"Bounding box karşılaştırma hatası: {e}")
+            return 0.0
 
     def _compare_geometry(self, geom1, geom2):
-        """Geometri verilerini karşılaştır"""
+        """Geometri karşılaştırması"""
         if not geom1 or not geom2:
             return 0.0
 
@@ -515,49 +755,79 @@ class SolidWorksAnalyzer:
         if 'volume' in geom1 and 'volume' in geom2 and geom1['volume'] > 0 and geom2['volume'] > 0:
             size_sim = 1.0 - abs(geom1['volume'] - geom2['volume']) / max(geom1['volume'], geom2['volume'])
 
-        # İmza benzerliği
-        sig_sim = 0.0
-        if 'signature' in geom1 and 'signature' in geom2:
-            sig_sim = difflib.SequenceMatcher(None, geom1['signature'], geom2['signature']).ratio()
+        # Yüzey benzerliği
+        surface_sim = 0.0
+        if 'surface_area' in geom1 and 'surface_area' in geom2 and geom1['surface_area'] > 0 and geom2['surface_area'] > 0:
+            surface_sim = 1.0 - abs(geom1['surface_area'] - geom2['surface_area']) / max(geom1['surface_area'], geom2['surface_area'])
+        elif 'signature' in geom1 and 'signature' in geom2:  # Eski yöntem - imza benzerliği
+            surface_sim = difflib.SequenceMatcher(None, geom1['signature'], geom2['signature']).ratio()
 
-        return (size_sim * 0.6 + sig_sim * 0.4) * 100
+        # Bounding box benzerliği
+        bbox_sim = self._compare_bounding_boxes(geom1.get('bbox', {}), geom2.get('bbox', {}))
+
+        # Ağırlıklı toplam
+        weights = {'size': 0.4, 'surface': 0.3, 'bbox': 0.3}
+        return (
+            size_sim * weights['size'] +
+            surface_sim * weights['surface'] +
+            bbox_sim * weights['bbox']
+        ) * 100
 
     def _calculate_final_score(self, feature_sim, sketch_sim, geom_sim):
         """Final skor hesaplama"""
         weights = {
-            'feature': 0.4,
-            'sketch': 0.3,
-            'geometry': 0.3
+            'feature': 0.35,  # Feature ağacı önemli
+            'sketch': 0.25,   # Sketch data orta önemli
+            'geometry': 0.40  # Geometri en önemli
         }
 
-        total_score = (
+        # Temel skor
+        base_score = (
             feature_sim * weights['feature'] +
             sketch_sim * weights['sketch'] +
             geom_sim * weights['geometry']
         )
 
+        # Geometri çok benzerse bonus
+        if geom_sim > 95:
+            base_score *= 1.1  # %10 bonus
+
+        # Feature tree çok benzerse bonus
+        if feature_sim > 90:
+            base_score *= 1.05  # %5 bonus
+
+        # Final skor (maximum 100)
+        final_score = min(100, base_score)
+
         return {
-            'score': total_score,
+            'score': final_score,
             'details': {
                 'feature_tree': feature_sim,
                 'sketch_data': sketch_sim,
-                'geometry': geom_sim
+                'geometry': geom_sim,
+                'base_score': base_score,
+                'geometry_bonus': 1.1 if geom_sim > 95 else 1.0,
+                'feature_bonus': 1.05 if feature_sim > 90 else 1.0
             },
-            'match': total_score > 99
+            'match': final_score > 99
         }
 
-    def _create_perfect_match(self):
-        """Mükemmel eşleşme sonucu"""
+    def _create_exact_match(self):
+        """Tam eşleşme sonucu"""
         return {
-            'score': 100.0,
+            'score': 100.0,  # 86.0'dan 100.0'a çıkarılmalı
             'details': {
+                'metadata': 100.0,
+                'hash': 100.0,
+                'content': 100.0,
+                'structure': 100.0,
                 'feature_tree': 100.0,
                 'sketch_data': 100.0,
                 'geometry': 100.0
             },
             'size_similarity': 100.0,
             'match': True,
-            'type': 'solidworks'
+            'type': 'exact'
         }
 
     def _create_save_as_match(self):
@@ -679,11 +949,12 @@ class FileComparator:
 
         # Karşılaştırma eşikleri
         self.thresholds = {
-            'exact_match': 99.9,    # Birebir aynı dosyalar
-            'save_as': 95.0,        # Save As ile kaydedilmiş
-            'minor_changes': 70.0,  # Küçük değişiklikler
-            'major_changes': 30.0,  # Büyük değişiklikler
-            'different': 0.0        # Tamamen farklı
+            'exact_match': 99.0,    # Birebir aynı
+            'save_as': 85.0,        # SaveAs ile oluşturulmuş
+            'high_similarity': 70.0, # Çok benzer
+            'similar': 50.0,        # Benzer
+            'low_similarity': 30.0,  # Az benzer
+            'different': 10.0       # Farklı
         }
 
     def compare_files(self, file1, file2):
@@ -823,19 +1094,29 @@ class FileComparator:
             return self._create_result(95.0, "Save As Kopyası", file1, file2,
                                      "Dosya farklı kaydedilmiş")
 
-        # Küçük değişiklik kontrolü
-        if score >= self.thresholds['minor_changes']:
-            return self._create_result(score, "Küçük Değişiklikler", file1, file2,
-                                     "Dosyada küçük değişiklikler var")
+        # Çok benzer dosyalar
+        if score >= self.thresholds['high_similarity']:
+            return self._create_result(score, "Çok Benzer", file1, file2,
+                                     "Dosyalar çok benzer yapıda")
 
-        # Büyük değişiklik kontrolü
-        if score >= self.thresholds['major_changes']:
-            return self._create_result(score, "Büyük Değişiklikler", file1, file2,
-                                     "Dosyada önemli değişiklikler var")
+        # Benzer dosyalar
+        if score >= self.thresholds['similar']:
+            return self._create_result(score, "Benzer", file1, file2,
+                                     "Dosyalar benzer özellikler içeriyor")
+
+        # Az benzer dosyalar
+        if score >= self.thresholds['low_similarity']:
+            return self._create_result(score, "Az Benzer", file1, file2,
+                                     "Dosyalar az benzerlik gösteriyor")
 
         # Farklı dosyalar
+        if score >= self.thresholds['different']:
+            return self._create_result(score, "Minimal Benzerlik", file1, file2,
+                                     "Dosyalar minimal benzerlik gösteriyor")
+
+        # Tamamen farklı dosyalar
         return self._create_result(score, "Farklı Dosyalar", file1, file2,
-                                 "Dosyalar birbirinden farklı")
+                                 "Dosyalar tamamen farklı")
 
     def _create_result(self, score, category, file1, file2, description="", match=False):
         """Standart sonuç sözlüğü oluşturur."""
