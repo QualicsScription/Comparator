@@ -42,3 +42,10 @@
 2025-04-21 16:14:00,607 - ERROR - SolidWorks dosya parsing hatas\u0131: [Errno 22] Invalid argument
 2025-04-21 16:14:00,622 - ERROR - SolidWorks dosya parsing hatas\u0131: [Errno 22] Invalid argument
 2025-04-21 16:14:10,207 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-21 16:26:28,717 - ERROR - SolidWorks dosya parsing hatas\u0131: [Errno 22] Invalid argument
+2025-04-21 16:26:29,289 - ERROR - SolidWorks dosya parsing hatas\u0131: [Errno 22] Invalid argument
+2025-04-21 16:26:29,680 - ERROR - SolidWorks dosya parsing hatas\u0131: [Errno 22] Invalid argument
+2025-04-21 16:26:29,937 - ERROR - SolidWorks dosya parsing hatas\u0131: [Errno 22] Invalid argument
+2025-04-21 16:26:30,108 - ERROR - SolidWorks dosya parsing hatas\u0131: [Errno 22] Invalid argument
+2025-04-21 16:26:30,128 - ERROR - SolidWorks dosya parsing hatas\u0131: [Errno 22] Invalid argument
+2025-04-21 16:27:04,386 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
