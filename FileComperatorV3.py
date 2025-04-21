@@ -270,12 +270,29 @@ class SolidWorksAnalyzer:
         """İki SolidWorks dosyasını karşılaştırır"""
         try:
             # Hash kontrolü
+            hash_sim = 0.0
             if self._compare_hash(file1, file2):
+                hash_sim = 100.0
                 return self._create_exact_match()
 
+<<<<<<< HEAD
             # Metadata karşılaştırması
+=======
+            # Binary karşılaştırma
+            binary_sim = self._compare_binary(file1, file2)
+            if binary_sim > 0.995:  # %99.5 üzeri benzerlik
+                hash_sim = 99.5
+                return self._create_exact_match()
+
+            # Detaylı analiz
+            data1 = self.parser.parse_features(file1)
+            data2 = self.parser.parse_features(file2)
+
+            # Temel karşılaştırmalar
+>>>>>>> e3ab479a2b4a85c313b2d1595ceb0c7337ed7713
             metadata_sim = self._compare_metadata(file1, file2)
 
+<<<<<<< HEAD
             # Feature tree karşılaştırması
             feature_sim = self._compare_features(
                 self._extract_features(file1),
@@ -338,7 +355,54 @@ class SolidWorksAnalyzer:
 
             # Montaj bilgilerini ekle
             if assembly_bonus:
+=======
+            # SaveAs kontrolü
+            if self._is_save_as(metadata_sim, content_sim, structure_sim):
+                return self._create_save_as_match()
+
+            # Montaj bonusu
+            assembly_bonus = None
+            if asm_info['same_assembly']:
+                # Orijinal değerleri sakla
+                original_structure = structure_sim
+                original_content = content_sim
+
+                # Bonusları uygula
+                structure_sim *= 1.2  # %20 bonus
+                content_sim *= 1.1    # %10 bonus
+
+                # Montaj bilgilerini sonuç sözlüğüne ekle
+                assembly_bonus = {
+                    'structure_bonus': 20,
+                    'content_bonus': 10,
+                    'original_structure': original_structure,
+                    'original_content': original_content,
+                    'assembly_name': asm_info['assembly_name'],
+                    'common_refs': asm_info['common_refs']
+                }
+
+            # Final skor hesaplama
+            result = self._calculate_final_score(metadata_sim, hash_sim, content_sim, structure_sim)
+
+            # Benzerlik değerlendirmesi
+            similarity_category = self._categorize_similarity(result['score'])
+            similarity_description = self._evaluate_similarity(metadata_sim, content_sim, structure_sim)
+
+            # Montaj bonusu uygula
+            if asm_info['same_assembly']:
+                # Montaj bonusu ile skor güncelleme
+                final_score = self._apply_assembly_bonus(result['score'], file1, file2)
+                result['score'] = final_score
+>>>>>>> e3ab479a2b4a85c313b2d1595ceb0c7337ed7713
                 result['assembly_relation'] = assembly_bonus
+                result['assembly_bonus_applied'] = True
+
+            # Ek bilgileri ekle
+            result['type'] = 'solidworks'
+            result['size_similarity'] = min(os.path.getsize(file1), os.path.getsize(file2)) / \
+                                      max(os.path.getsize(file1), os.path.getsize(file2)) * 100
+            result['similarity_category'] = similarity_category
+            result['similarity_description'] = similarity_description
 
             return result
 
@@ -725,6 +789,7 @@ class SolidWorksAnalyzer:
 
         return difflib.SequenceMatcher(None, geom1, geom2).ratio() * 100
 
+<<<<<<< HEAD
     def _calculate_final_score(self, metadata_sim, feature_sim, sketch_sim, geom_sim):
         """Final skor hesaplama"""
         weights = {
@@ -732,10 +797,38 @@ class SolidWorksAnalyzer:
             'feature': 0.30,
             'sketch': 0.25,
             'geometry': 0.30
+=======
+        # Yüzey benzerliği
+        surface_sim = 0.0
+        if 'surface_area' in geom1 and 'surface_area' in geom2 and geom1['surface_area'] > 0 and geom2['surface_area'] > 0:
+            surface_sim = 1.0 - abs(geom1['surface_area'] - geom2['surface_area']) / max(geom1['surface_area'], geom2['surface_area'])
+        elif 'signature' in geom1 and 'signature' in geom2:  # Eski yöntem - imza benzerliği
+            surface_sim = difflib.SequenceMatcher(None, geom1['signature'], geom2['signature']).ratio()
+
+        # Bounding box benzerliği
+        bbox_sim = self._compare_bounding_boxes(geom1.get('bbox', {}), geom2.get('bbox', {}))
+
+        # Ağırlıklı toplam
+        weights = {'size': 0.4, 'surface': 0.3, 'bbox': 0.3}
+        return (
+            size_sim * weights['size'] +
+            surface_sim * weights['surface'] +
+            bbox_sim * weights['bbox']
+        ) * 100
+
+    def _calculate_final_score(self, metadata_sim, hash_sim, content_sim, structure_sim):
+        """Final skor hesaplama"""
+        weights = {
+            'metadata': 0.20,    # Metadata önemli ama kritik değil
+            'hash': 0.10,        # Hash eşleşmesi bonus gibi
+            'content': 0.40,     # İçerik (geometri) en önemli
+            'structure': 0.30    # Yapı önemli ama içerik kadar değil
+>>>>>>> e3ab479a2b4a85c313b2d1595ceb0c7337ed7713
         }
 
         base_score = (
             metadata_sim * weights['metadata'] +
+<<<<<<< HEAD
             feature_sim * weights['feature'] +
             sketch_sim * weights['sketch'] +
             geom_sim * weights['geometry']
@@ -750,6 +843,41 @@ class SolidWorksAnalyzer:
             base_score *= 1.05  # %5 bonus
 
         return min(100, base_score)
+=======
+            hash_sim * weights['hash'] +
+            content_sim * weights['content'] +
+            structure_sim * weights['structure']
+        )
+
+        # Geometri bonusu (content_sim geometriyi temsil ediyor)
+        geometry_bonus = 1.0
+        if content_sim > 95:
+            geometry_bonus = 1.2  # %20 bonus
+            base_score *= geometry_bonus
+
+        # Hash bonusu
+        hash_bonus = False
+        if hash_sim == 100:
+            hash_bonus = True
+            base_score = 100  # Tam eşleşme
+
+        # Final skor (maximum 100)
+        final_score = min(100, base_score)
+
+        return {
+            'score': final_score,
+            'details': {
+                'metadata': metadata_sim,
+                'hash': hash_sim,
+                'content': content_sim,
+                'structure': structure_sim,
+                'base_score': base_score,
+                'geometry_bonus': geometry_bonus,
+                'hash_bonus': hash_bonus
+            },
+            'match': final_score > 99
+        }
+>>>>>>> e3ab479a2b4a85c313b2d1595ceb0c7337ed7713
 
     def _create_exact_match(self):
         """Tam eşleşme sonucu"""
