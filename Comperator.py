@@ -11,6 +11,8 @@ import time
 import zipfile
 from datetime import datetime
 from collections import Counter
+import logging
+from pathlib import Path
 
 # Bağımlılık kontrolü ve kurulum
 def install_deps():

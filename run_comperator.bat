@@ -1,0 +1,3 @@
+@echo off
+echo Starting File Comperator...
+.\comperator_env\Scripts\python.exe FileComperatorV3.py

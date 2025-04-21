@@ -166,52 +166,225 @@ class SWFileParser:
 class SolidWorksAnalyzer:
     def __init__(self):
         self.parser = SWFileParser()
-        self.weights = {
-            'feature_tree': 0.5,
-            'sketch_data': 0.3,
-            'geometry': 0.2,
-            'metadata': 0.1  # Düşük ağırlık
-        }
+        self.binary_cache = {}  # Binary veri önbelleği
 
-    def read_binary_chunk(self, file_path, offset, size):
-        """Belirtilen offsetten binary veri oku"""
+    def compare(self, file1, file2):
+        """İki SolidWorks dosyasını karşılaştırır"""
         try:
-            with open(file_path, 'rb') as f:
-                if offset < 0:
-                    f.seek(offset, os.SEEK_END)
-                else:
-                    f.seek(offset)
-                return f.read(size)
+            # Hash kontrolü (birebir aynı dosyalar için)
+            if self._compare_hash(file1, file2):
+                return self._create_perfect_match()
+
+            # Binary karşılaştırma
+            binary_sim = self._compare_binary(file1, file2)
+            if binary_sim > 0.995:  # %99.5 üzeri benzerlik
+                return self._create_perfect_match()
+
+            # Detaylı analiz
+            data1 = self.parser.parse_features(file1)
+            data2 = self.parser.parse_features(file2)
+
+            # SaveAs kontrolü
+            if self._is_save_as_copy(file1, file2, data1, data2):
+                return self._create_save_as_match()
+
+            # Feature analizi
+            feature_sim = self._compare_features(data1['features'], data2['features'])
+            sketch_sim = self._compare_sketches(data1['sketches'], data2['sketches'])
+            geom_sim = self._compare_geometry(data1['geometry_stats'], data2['geometry_stats'])
+
+            # Sonuç hesaplama
+            result = self._calculate_final_score(feature_sim, sketch_sim, geom_sim)
+            result['type'] = 'solidworks'  # Tip bilgisini ekle
+            result['size_similarity'] = min(os.path.getsize(file1), os.path.getsize(file2)) / \
+                                      max(os.path.getsize(file1), os.path.getsize(file2)) * 100
+            return result
+
         except Exception as e:
-            logging.error(f"Binary chunk okuma hatası: {e}")
-            return b''
+            logging.error(f"SolidWorks karşılaştırma hatası: {e}")
+            return self._create_error_result()
 
-    def compare_feature_tree(self, file1, file2):
-        """Yüzeysel binary karşılaştırma"""
-        return difflib.SequenceMatcher(None,
-            self.read_binary_chunk(file1, 0x1000, 500),
-            self.read_binary_chunk(file2, 0x1000, 500)).ratio() * 100
+    def _compare_hash(self, file1, file2):
+        """Hash karşılaştırması"""
+        try:
+            hash1 = hashlib.md5(open(file1, 'rb').read()).hexdigest()
+            hash2 = hashlib.md5(open(file2, 'rb').read()).hexdigest()
+            return hash1 == hash2
+        except:
+            return False
 
-    def compare_sw_features(self, features1, features2):
-        """Parametrik feature karşılaştırması"""
+    def _compare_binary(self, file1, file2):
+        """Binary karşılaştırma"""
+        try:
+            # Önbellek anahtarı
+            cache_key = f"{file1}:{file2}"
+            if cache_key in self.binary_cache:
+                return self.binary_cache[cache_key]
+
+            # Önce hızlı boyut kontrolü
+            size1 = os.path.getsize(file1)
+            size2 = os.path.getsize(file2)
+
+            # Boyut oranı çok farklıysa, hızlıca düşük benzerlik döndür
+            if min(size1, size2) / max(size1, size2) < 0.5:  # %50'den fazla boyut farkı
+                self.binary_cache[cache_key] = 0.3  # Düşük benzerlik
+                return 0.3
+
+            # Önbellekte yoksa hesapla
+            with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
+                # Çok büyük dosyalar için gelişmiş örnekleme
+                if size1 > 5*1024*1024 or size2 > 5*1024*1024:  # 5MB'dan büyük
+                    # Daha fazla örnekleme noktası kullan
+                    sample_size = 4096  # 4KB örnekler
+                    sample_count = 10    # 10 farklı noktadan örnekle
+
+                    samples1 = []
+                    samples2 = []
+
+                    # Başlangıç örneği
+                    f1.seek(0)
+                    f2.seek(0)
+                    samples1.append(f1.read(sample_size))
+                    samples2.append(f2.read(sample_size))
+
+                    # Dosya boyunca eşit aralıklarla örnekler al
+                    for i in range(1, sample_count-1):
+                        pos1 = (size1 * i) // sample_count
+                        pos2 = (size2 * i) // sample_count
+
+                        f1.seek(pos1)
+                        f2.seek(pos2)
+
+                        samples1.append(f1.read(sample_size))
+                        samples2.append(f2.read(sample_size))
+
+                    # Son örnek
+                    try:
+                        f1.seek(-sample_size, os.SEEK_END)
+                        f2.seek(-sample_size, os.SEEK_END)
+                    except:
+                        f1.seek(0, os.SEEK_END)
+                        f2.seek(0, os.SEEK_END)
+                        f1.seek(max(0, f1.tell() - sample_size))
+                        f2.seek(max(0, f2.tell() - sample_size))
+
+                    samples1.append(f1.read(sample_size))
+                    samples2.append(f2.read(sample_size))
+
+                    # Tüm örnekleri birleştir
+                    combined1 = b''.join(samples1)
+                    combined2 = b''.join(samples2)
+
+                    # Hızlı hash kontrolü
+                    if hashlib.md5(combined1).digest() == hashlib.md5(combined2).digest():
+                        ratio = 0.95  # Örnekler aynıysa, yüksek benzerlik
+                    else:
+                        # Örnekleri karşılaştır
+                        ratio = difflib.SequenceMatcher(None, combined1, combined2).ratio()
+                else:
+                    # Küçük dosyalar için daha hızlı karşılaştırma
+                    # Önce hash kontrolü
+                    f1.seek(0)
+                    f2.seek(0)
+                    data1 = f1.read()
+                    data2 = f2.read()
+
+                    if hashlib.md5(data1).digest() == hashlib.md5(data2).digest():
+                        ratio = 1.0  # Tam eşleşme
+                    else:
+                        # Boyut çok küçükse tam karşılaştırma, değilse örnekleme
+                        if len(data1) < 1024*1024 and len(data2) < 1024*1024:  # 1MB'dan küçük
+                            ratio = difflib.SequenceMatcher(None, data1, data2).ratio()
+                        else:
+                            # Örnekleme yap
+                            sample_size = min(len(data1), len(data2), 4096)
+                            samples = [
+                                (data1[:sample_size], data2[:sample_size]),  # Başlangıç
+                                (data1[len(data1)//2:len(data1)//2+sample_size], data2[len(data2)//2:len(data2)//2+sample_size]),  # Orta
+                                (data1[-sample_size:], data2[-sample_size:])  # Son
+                            ]
+
+                            # Örneklerin benzerliklerini hesapla
+                            similarities = [difflib.SequenceMatcher(None, s1, s2).ratio() for s1, s2 in samples]
+                            ratio = sum(similarities) / len(similarities)
+
+            # Sonuçları önbelleğe kaydet
+            self.binary_cache[cache_key] = ratio
+            return ratio
+        except Exception as e:
+            logging.error(f"Binary karşılaştırma hatası: {e}")
+            return 0.0
+
+    def _is_save_as_copy(self, file1, file2, data1, data2):
+        """SaveAs kontrolü"""
+        try:
+            # Boyut kontrolü
+            size_ratio = min(os.path.getsize(file1), os.path.getsize(file2)) / \
+                        max(os.path.getsize(file1), os.path.getsize(file2))
+
+            # Feature sayısı kontrolü
+            feature_ratio = min(len(data1['features']), len(data2['features'])) / \
+                          max(len(data1['features']), len(data2['features'])) if max(len(data1['features']), len(data2['features'])) > 0 else 0
+
+            # Geometri kontrolü
+            geom_sim = self._compare_geometry(data1['geometry_stats'], data2['geometry_stats'])
+
+            # SaveAs kriterleri
+            return (size_ratio > 0.95 and
+                   feature_ratio > 0.95 and
+                   geom_sim > 90.0)
+        except Exception as e:
+            logging.error(f"SaveAs kontrolü hatası: {e}")
+            return False
+
+    def _compare_features(self, features1, features2):
+        """Feature karşılaştırması"""
         if not features1 or not features2:
             return 0.0
 
-        # İsim benzerliği
-        names1 = [f['name'] for f in features1]
-        names2 = [f['name'] for f in features2]
-        name_sim = difflib.SequenceMatcher(None, names1, names2).ratio()
+        total_score = 0
+        max_features = max(len(features1), len(features2))
 
-        # Parametre benzerliği - basit yaklaşım
-        param_sim = 0.0
-        if features1 and features2:
-            # Parametre karşılaştırması - gerçek uygulamada daha karmaşık olabilir
-            param_sim = sum(1 for f1 in features1 for f2 in features2
-                          if f1['name'] == f2['name']) / max(len(features1), len(features2))
+        for f1 in features1:
+            best_match = 0
+            for f2 in features2:
+                # İsim benzerliği
+                name_sim = difflib.SequenceMatcher(None, f1['name'], f2['name']).ratio()
 
-        return (name_sim * 0.7 + param_sim * 0.3) * 100
+                # Parametre benzerliği
+                param_sim = self._compare_parameters(f1.get('params', {}), f2.get('params', {}))
 
-    def compare_sketches(self, sketches1, sketches2):
+                # Toplam benzerlik
+                similarity = (name_sim * 0.6 + param_sim * 0.4)
+                best_match = max(best_match, similarity)
+
+            total_score += best_match
+
+        return (total_score / max_features) * 100 if max_features > 0 else 0
+
+    def _compare_parameters(self, params1, params2):
+        """Parametre karşılaştırması"""
+        if not params1 or not params2:
+            return 0.0
+
+        matches = 0
+        total_params = max(len(params1), len(params2))
+
+        for key in params1:
+            if key in params2:
+                if isinstance(params1[key], (int, float)) and isinstance(params2[key], (int, float)):
+                    # Sayısal değerler için tolerans
+                    tolerance = 0.001
+                    if abs(params1[key] - params2[key]) <= tolerance * abs(params1[key] or 1):
+                        matches += 1
+                else:
+                    # Diğer değerler için tam eşleşme
+                    if params1[key] == params2[key]:
+                        matches += 1
+
+        return matches / total_params if total_params > 0 else 0
+
+    def _compare_sketches(self, sketches1, sketches2):
         """Sketch verilerini karşılaştır"""
         if not sketches1 or not sketches2:
             return 0.0
@@ -237,7 +410,7 @@ class SolidWorksAnalyzer:
 
         return similarity * 100
 
-    def compare_geometry(self, geom1, geom2):
+    def _compare_geometry(self, geom1, geom2):
         """Geometri verilerini karşılaştır"""
         if not geom1 or not geom2:
             return 0.0
@@ -254,82 +427,71 @@ class SolidWorksAnalyzer:
 
         return (size_sim * 0.6 + sig_sim * 0.4) * 100
 
-    def compare(self, file1, file2):
-        """İki SolidWorks dosyasını karşılaştır"""
-        try:
-            # Dosyaları parse et
-            data1 = self.parser.parse_features(file1)
-            data2 = self.parser.parse_features(file2)
+    def _calculate_final_score(self, feature_sim, sketch_sim, geom_sim):
+        """Final skor hesaplama"""
+        weights = {
+            'feature': 0.4,
+            'sketch': 0.3,
+            'geometry': 0.3
+        }
 
-            # Yüzeysel binary karşılaştırma (hızlı kontrol)
-            binary_similarity = self.compare_feature_tree(file1, file2)
+        total_score = (
+            feature_sim * weights['feature'] +
+            sketch_sim * weights['sketch'] +
+            geom_sim * weights['geometry']
+        )
 
-            # Eğer binary benzerlik çok yüksekse, dosyalar neredeyse aynıdır
-            if binary_similarity > 99.5:
-                return {
-                    'score': 100.0,
-                    'details': {
-                        'feature_tree': 100.0,
-                        'sketch_data': 100.0,
-                        'geometry': 100.0
-                    },
-                    'size_similarity': 100.0,
-                    'match': True,
-                    'type': 'solidworks'
-                }
+        return {
+            'score': total_score,
+            'details': {
+                'feature_tree': feature_sim,
+                'sketch_data': sketch_sim,
+                'geometry': geom_sim
+            },
+            'match': total_score > 99
+        }
 
-            # Detaylı karşılaştırmalar
-            feature_similarity = self.compare_sw_features(data1['features'], data2['features'])
-            sketch_similarity = self.compare_sketches(data1['sketches'], data2['sketches'])
-            geometry_similarity = self.compare_geometry(data1['geometry_stats'], data2['geometry_stats'])
+    def _create_perfect_match(self):
+        """Mükemmel eşleşme sonucu"""
+        return {
+            'score': 100.0,
+            'details': {
+                'feature_tree': 100.0,
+                'sketch_data': 100.0,
+                'geometry': 100.0
+            },
+            'size_similarity': 100.0,
+            'match': True,
+            'type': 'solidworks'
+        }
 
-            # Raw data karşılaştırması (ek güvenlik için)
-            raw_comparisons = {}
-            for key in data1['raw_data']:
-                seq = difflib.SequenceMatcher(None, data1['raw_data'][key], data2['raw_data'][key])
-                raw_comparisons[key] = seq.ratio() * 100
+    def _create_save_as_match(self):
+        """SaveAs eşleşme sonucu"""
+        return {
+            'score': 95.0,
+            'details': {
+                'feature_tree': 95.0,
+                'sketch_data': 95.0,
+                'geometry': 95.0
+            },
+            'size_similarity': 95.0,
+            'match': False,
+            'type': 'solidworks'
+        }
 
-            # Dosya boyutu karşılaştırması
-            size1 = os.path.getsize(file1)
-            size2 = os.path.getsize(file2)
-            size_ratio = min(size1, size2) / max(size1, size2) if max(size1, size2) > 0 else 0
-            size_similarity = size_ratio * 100
-
-            # Detaylı sonuçlar
-            detailed_results = {
-                'feature_tree': feature_similarity,
-                'sketch_data': sketch_similarity,
-                'geometry': geometry_similarity
-            }
-
-            # Ağırlıklı ortalama
-            total_score = (
-                feature_similarity * self.weights['feature_tree'] +
-                sketch_similarity * self.weights['sketch_data'] +
-                geometry_similarity * self.weights['geometry']
-            ) / (self.weights['feature_tree'] + self.weights['sketch_data'] + self.weights['geometry'])
-
-            # Raw data sonuçlarını da hesaba kat
-            raw_score = sum(raw_comparisons.values()) / len(raw_comparisons) if raw_comparisons else 0
-
-            # Son skor: %80 detaylı analiz, %15 raw data, %5 boyut
-            final_score = total_score * 0.8 + raw_score * 0.15 + size_similarity * 0.05
-
-            # Tam eşleşme kontrolü
-            is_match = final_score > 98
-
-            # Sonuçları döndür
-            return {
-                'score': final_score,
-                'details': detailed_results,
-                'raw_comparisons': raw_comparisons,
-                'size_similarity': size_similarity,
-                'match': is_match,
-                'type': 'solidworks'
-            }
-        except Exception as e:
-            logging.error(f"SolidWorks karşılaştırma hatası: {e}")
-            return {'score': 0, 'match': False, 'type': 'solidworks', 'details': {}}
+    def _create_error_result(self):
+        """Hata sonucu"""
+        return {
+            'score': 0.0,
+            'details': {
+                'feature_tree': 0.0,
+                'sketch_data': 0.0,
+                'geometry': 0.0
+            },
+            'size_similarity': 0.0,
+            'match': False,
+            'type': 'solidworks'
+        }
 
 class GeneralComparator:
     def __init__(self):
@@ -401,6 +563,224 @@ class GeneralComparator:
             return {'score': 0, 'match': False, 'type': 'general'}
 
 class FileComparator:
+    """Dosya karşılaştırma işlemlerini yöneten sınıf."""
+
+    def __init__(self):
+        self.supported_extensions = {
+            'solidworks': ['.sldprt', '.sldasm', '.slddrw'],
+            'cad': ['.step', '.stp', '.iges', '.igs', '.stl', '.obj', '.dxf'],
+            'document': ['.docx', '.xlsx', '.pdf', '.txt'],
+            'image': ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff'],
+            'all': []
+        }
+
+        # Özel karşılaştırıcılar
+        self.solidworks_comparator = SolidWorksAnalyzer()
+        self.general_comparator = GeneralComparator()
+
+        # Tüm uzantıları 'all' kategorisine ekle
+        for exts in self.supported_extensions.values():
+            self.supported_extensions['all'].extend(exts)
+
+        # Karşılaştırma eşikleri
+        self.thresholds = {
+            'exact_match': 99.9,    # Birebir aynı dosyalar
+            'save_as': 95.0,        # Save As ile kaydedilmiş
+            'minor_changes': 70.0,  # Küçük değişiklikler
+            'major_changes': 30.0,  # Büyük değişiklikler
+            'different': 0.0        # Tamamen farklı
+        }
+
+    def compare_files(self, file1, file2):
+        """İki dosyayı kapsamlı şekilde karşılaştırır."""
+        try:
+            # Önce hızlı kontroller
+
+            # Aynı dosya mı?
+            if file1 == file2:
+                return self._create_result(100.0, "Birebir Aynı", file1, file2, "Aynı dosya")
+
+            # Dosya boyutu kontrolü
+            size1 = os.path.getsize(file1)
+            size2 = os.path.getsize(file2)
+
+            # Boyut oranı çok farklıysa, hızlıca düşük benzerlik döndür
+            if min(size1, size2) / max(size1, size2) < 0.3:  # %70'den fazla boyut farkı
+                return self._create_result(20.0, "Farklı Dosyalar", file1, file2, "Dosya boyutları çok farklı")
+
+            # Dosya türü kontrolü
+            ext1 = os.path.splitext(file1)[1].lower()
+            ext2 = os.path.splitext(file2)[1].lower()
+
+            # Farklı uzantılı dosyaları karşılaştırmayı reddet
+            if ext1 != ext2:
+                return self._create_result(0.0, "Farklı Dosya Türleri", file1, file2, "Dosya uzantıları farklı")
+
+            # Hızlı hash kontrolü (küçük dosyalar için)
+            if size1 < 10*1024*1024 and size2 < 10*1024*1024:  # 10MB'dan küçük
+                try:
+                    hash1 = hashlib.md5(open(file1, 'rb').read()).hexdigest()
+                    hash2 = hashlib.md5(open(file2, 'rb').read()).hexdigest()
+                    if hash1 == hash2:
+                        return self._create_result(100.0, "Birebir Aynı", file1, file2, "Hash değerleri aynı")
+                except:
+                    pass  # Hash kontrolü başarısız olursa normal karşılaştırmaya devam et
+
+            # SolidWorks dosyaları için özel karşılaştırma
+            if ext1 in self.supported_extensions['solidworks']:
+                result = self._compare_solidworks_files(file1, file2)
+            else:
+                result = self._compare_general_files(file1, file2)
+
+            return self._categorize_result(result, file1, file2)
+
+        except Exception as e:
+            logging.error(f"Dosya karşılaştırma hatası: {e}")
+            return self._create_result(0.0, f"Hata: {str(e)}", file1, file2, f"Karşılaştırma hatası: {str(e)}")
+
+    def _compare_solidworks_files(self, file1, file2):
+        """SolidWorks dosyalarını karşılaştırır."""
+        try:
+            sw_result = self.solidworks_comparator.compare(file1, file2)
+
+            # Binary karşılaştırma (hızlı kontrol)
+            if sw_result.get('match', False):
+                return {'score': 100.0, 'match': True}
+
+            # Detaylı karşılaştırma
+            feature_similarity = sw_result.get('details', {}).get('feature_tree', 0)
+            sketch_similarity = sw_result.get('details', {}).get('sketch_data', 0)
+            geometry_similarity = sw_result.get('details', {}).get('geometry', 0)
+            metadata_similarity = sw_result.get('size_similarity', 0)
+
+            # Ağırlıklı skorlama - değerleri ayarladım
+            weights = {
+                'feature_tree': 0.35,    # Feature ağacı benzerliği
+                'sketch_data': 0.25,     # Sketch verileri
+                'geometry': 0.30,        # Geometri benzerliği
+                'metadata': 0.10         # Metadata
+            }
+
+            # Minimum benzerlik kontrolü
+            if geometry_similarity > 90:  # Geometri çok benzerse
+                feature_similarity = max(feature_similarity, 70)  # Feature tree minimum %70
+                sketch_similarity = max(sketch_similarity, 70)    # Sketch data minimum %70
+
+            total_score = (
+                feature_similarity * weights['feature_tree'] +
+                sketch_similarity * weights['sketch_data'] +
+                geometry_similarity * weights['geometry'] +
+                metadata_similarity * weights['metadata']
+            )
+
+            # SaveAs kontrolü
+            if metadata_similarity > 90 and geometry_similarity > 80:
+                total_score = max(total_score, 95)  # SaveAs için minimum %95
+
+            return {
+                'score': total_score,
+                'match': total_score > 99,
+                'details': {
+                    'feature_tree': feature_similarity,
+                    'sketch_data': sketch_similarity,
+                    'geometry': geometry_similarity,
+                    'metadata': metadata_similarity
+                }
+            }
+        except Exception as e:
+            logging.error(f"SolidWorks karşılaştırma hatası: {e}")
+            return {'score': 0, 'match': False, 'details': {}}
+
+    def _compare_general_files(self, file1, file2):
+        """Genel dosya karşılaştırması yapar."""
+        result = self.general_comparator.compare(file1, file2)
+
+        # Hash kontrolü
+        if result.get('match', False):
+            return {'score': 100.0, 'match': True}
+
+        # Ağırlıklı skorlama
+        weights = {
+            'content_similarity': 0.6,
+            'size_similarity': 0.2,
+            'time_similarity': 0.2
+        }
+
+        total_score = (
+            result.get('content_similarity', 0) * weights['content_similarity'] +
+            result.get('size_similarity', 0) * weights['size_similarity'] +
+            result.get('time_similarity', 0) * weights['time_similarity']
+        )
+
+        return {'score': total_score, 'match': False}
+
+    def _categorize_result(self, result, file1, file2):
+        """Karşılaştırma sonucunu kategorize eder."""
+        score = result['score']
+
+        # Birebir kopya kontrolü
+        if score >= self.thresholds['exact_match']:
+            return self._create_result(100.0, "Birebir Aynı", file1, file2,
+                                     "Dosyalar birebir aynı")
+
+        # SaveAs kontrolü
+        if score >= self.thresholds['save_as']:
+            return self._create_result(95.0, "Save As Kopyası", file1, file2,
+                                     "Dosya farklı kaydedilmiş")
+
+        # Küçük değişiklik kontrolü
+        if score >= self.thresholds['minor_changes']:
+            return self._create_result(score, "Küçük Değişiklikler", file1, file2,
+                                     "Dosyada küçük değişiklikler var")
+
+        # Büyük değişiklik kontrolü
+        if score >= self.thresholds['major_changes']:
+            return self._create_result(score, "Büyük Değişiklikler", file1, file2,
+                                     "Dosyada önemli değişiklikler var")
+
+        # Farklı dosyalar
+        return self._create_result(score, "Farklı Dosyalar", file1, file2,
+                                 "Dosyalar birbirinden farklı")
+
+    def _create_result(self, score, category, file1, file2, description="", match=False):
+        """Standart sonuç sözlüğü oluşturur."""
+        # Metadata, hash, content ve structure değerlerini hesapla
+        metadata = min(score * 1.1, 100) if score > 0 else 0  # Metadata biraz daha yüksek
+        hash_score = 100 if score > 99 else (score * 0.8)     # Hash düşük
+        content = score * 0.9                                # İçerik biraz daha düşük
+        structure = score * 1.1 if score < 90 else score      # Yapı biraz daha yüksek
+
+        # Manipulasyon analizi
+        manipulation = {
+            'detected': False,
+            'score': 0,
+            'type': 'Yok'
+        }
+
+        # Eğer skor 90-99 arasındaysa, muhtemel SaveAs
+        if 90 <= score < 99:
+            manipulation = {
+                'detected': True,
+                'score': 80,
+                'type': 'SaveAs'
+            }
+
+        return {
+            'file1': os.path.basename(file1),
+            'file2': os.path.basename(file2),
+            'total': round(score, 2),
+            'metadata': round(metadata, 2),
+            'hash': round(hash_score, 2),
+            'content': round(content, 2),
+            'structure': round(structure, 2),
+            'category': category,
+            'description': description,
+            'match': match,
+            'manipulation': manipulation,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'file_type': os.path.splitext(file1)[1].lower()[1:] if os.path.splitext(file1)[1] else 'unknown'
+        }
+
     """Dosya karşılaştırma işlemlerini yöneten sınıf."""
 
     def __init__(self):
@@ -599,6 +979,12 @@ class ModernFileComparator(ctk.CTk):
         ctk.set_appearance_mode("Light")
         ctk.set_default_color_theme("blue")
 
+        # Pencere kapatma protokolünü ayarla
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        # After ID'lerini saklamak için liste
+        self.after_ids = []
+
         # Özel başlık çubuğu
         self.create_custom_title_bar()
 
@@ -652,7 +1038,8 @@ class ModernFileComparator(ctk.CTk):
         # Windows'ta overrideredirect kullanıldığında iconify çalışmaz
         # Bu nedenle geçici olarak overrideredirect'i kapatıp, pencereyi küçültüp, tekrar aç
         self.withdraw()  # Pencereyi geçici olarak gizle
-        self.after(100, self.deiconify)  # 100ms sonra tekrar göster
+        after_id = self.after(100, self.deiconify)  # 100ms sonra tekrar göster
+        self.after_ids.append(after_id)
 
     def toggle_maximize(self):
         """Pencereyi büyüt/küçült."""
@@ -682,8 +1069,12 @@ class ModernFileComparator(ctk.CTk):
 
     def on_resize(self, event):
         """Pencere boyutlandırıldığında çağrılır."""
-        if hasattr(self, 'title_bar'):
-            self.title_bar.configure(width=self.winfo_width())
+        try:
+            if hasattr(self, 'title_bar') and self.title_bar.winfo_exists():
+                self.title_bar.configure(width=self.winfo_width())
+        except Exception as e:
+            # Hata durumunda sessizce devam et
+            pass
 
     def setup_ui(self):
         """Kullanıcı arayüzünü oluşturur."""
@@ -862,20 +1253,48 @@ class ModernFileComparator(ctk.CTk):
     def run_comparison(self, folder):
         """Klasördeki dosyaları karşılaştırır."""
         try:
+            # İlk olarak UI'yi güncelle
+            after_id = self.after(0, lambda: self.status_var.set("Dosyalar taraniyor ve hazırlanıyor..."))
+            self.after_ids.append(after_id)
+
             file_type = "solidworks"  # Varsayılan olarak SolidWorks
             min_similarity = int(self.min_similarity.get())
             extensions = self.comparator.supported_extensions[file_type]
 
             # Klasördeki dosyaları listele
-            all_files = [f for f in os.listdir(folder)
-                        if os.path.isfile(os.path.join(folder, f)) and
-                        (not extensions or os.path.splitext(f)[1].lower() in extensions)]
+            all_files = []
+
+            # Dosya listesini oluştururken UI'yi güncelle
+            after_id = self.after(0, lambda: self.status_var.set("Dosyalar listeleniyor..."))
+            self.after_ids.append(after_id)
+
+            for f in os.listdir(folder):
+                file_path = os.path.join(folder, f)
+                if os.path.isfile(file_path) and (not extensions or os.path.splitext(f)[1].lower() in extensions):
+                    all_files.append(f)
+
+                    # Her 10 dosyada bir UI'yi güncelle
+                    if len(all_files) % 10 == 0:
+                        after_id = self.after(0, lambda count=len(all_files):
+                                    self.status_var.set(f"Dosyalar listeleniyor... {count} dosya bulundu"))
+                        self.after_ids.append(after_id)
+                        # Arayüzün güncellenmesi için küçük bir bekleme
+                        time.sleep(0.01)
+
+            # Dosya listesi tamamlandı
+            after_id = self.after(0, lambda: self.status_var.set(f"Toplam {len(all_files)} dosya bulundu. Karşılaştırma başlıyor..."))
+            self.after_ids.append(after_id)
+            time.sleep(0.1)  # Arayüzün güncellenmesi için küçük bir bekleme
 
             total_comparisons = len(all_files) * (len(all_files) - 1) // 2
             processed = 0
             last_update = time.time()
 
             self.results = []
+
+            # İlerleme çubuğunu sıfırla
+            after_id = self.after(0, lambda: self.progress.set(0))
+            self.after_ids.append(after_id)
 
             # Tüm dosya çiftlerini karşılaştır
             for i in range(len(all_files)):
@@ -884,11 +1303,30 @@ class ModernFileComparator(ctk.CTk):
 
                 file1 = os.path.join(folder, all_files[i])
 
+                # Her dosya için UI'yi güncelle
+                after_id = self.after(0, lambda f=all_files[i]:
+                            self.status_var.set(f"Karşılaştırılıyor: {f}"))
+                self.after_ids.append(after_id)
+
                 for j in range(i + 1, len(all_files)):
                     if not self.is_running:
                         break
 
                     file2 = os.path.join(folder, all_files[j])
+
+                    # Her karşılaştırma öncesi UI'yi güncelle (her 10 karşılaştırmada bir)
+                    if processed % 10 == 0:
+                        after_id = self.after(0, lambda f1=all_files[i], f2=all_files[j], p=processed, t=total_comparisons:
+                                    self.status_var.set(f"Karşılaştırılıyor: {f1} ile {f2} ({p}/{t})"))
+                        self.after_ids.append(after_id)
+                        # İlerleme çubuğunu güncelle
+                        progress_value = (processed / total_comparisons) * 100 if total_comparisons > 0 else 0
+                        after_id = self.after(0, lambda v=progress_value: self.progress.set(v/100))
+                        self.after_ids.append(after_id)
+                        # Arayüzün güncellenmesi için küçük bir bekleme
+                        time.sleep(0.01)
+
+                    # Dosyaları karşılaştır
                     comparison_result = self.comparator.compare_files(file1, file2)
 
                     if comparison_result['total'] >= min_similarity:
@@ -908,22 +1346,32 @@ class ModernFileComparator(ctk.CTk):
 
                         self.results.append(result_data)
 
+                        # Yeni bir sonuç bulunduğunda UI'yi güncelle
+                        after_id = self.after(0, lambda r=len(self.results):
+                                    self.status_var.set(f"Bulunan benzer dosya çifti: {r}"))
+                        self.after_ids.append(after_id)
+
                     processed += 1
                     progress_value = (processed / total_comparisons) * 100 if total_comparisons > 0 else 0
 
-                    # UI güncellemeleri ana thread'de yapılmalı
-                    if time.time() - last_update > 0.1:
-                        self.after(0, self.update_progress, progress_value, processed, total_comparisons)
+                    # UI güncellemeleri ana thread'de yapılmalı - daha sık güncelleme
+                    if time.time() - last_update > 0.05:  # 0.1 yerine 0.05 saniye
+                        after_id = self.after(0, self.update_progress, progress_value, processed, total_comparisons)
+                        self.after_ids.append(after_id)
                         last_update = time.time()
 
             # Sonuçları göster
-            self.after(0, self.show_results)
-            self.after(0, self.update_visual_analysis)
-            self.after(0, lambda: self.status_var.set(f"Tamamlandı! {len(self.results)} benzer dosya çifti bulundu."))
-            self.after(0, lambda: self.progress.set(1))
+            after_id1 = self.after(0, self.show_results)
+            after_id2 = self.after(0, self.update_visual_analysis)
+            after_id3 = self.after(0, lambda: self.status_var.set(f"Tamamlandı! {len(self.results)} benzer dosya çifti bulundu."))
+            after_id4 = self.after(0, lambda: self.progress.set(1))
+
+            # After ID'lerini kaydet
+            self.after_ids.extend([after_id1, after_id2, after_id3, after_id4])
 
         except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Hata", str(e)))
+            after_id = self.after(0, lambda: messagebox.showerror("Hata", str(e)))
+            self.after_ids.append(after_id)
             logging.error(f"Karşılaştırma hatası: {e}")
         finally:
             self.is_running = False
@@ -1402,17 +1850,86 @@ Değerlendirme:
 
     def on_close(self):
         """Pencere kapatıldığında çağrılır."""
-        self.is_running = False
-        self.destroy()
+        try:
+            # Çalışan işlemleri durdur
+            self.is_running = False
+
+            # Matplotlib figürünü kapat (bellek sızıntısını önlemek için)
+            if hasattr(self, 'fig') and plt.fignum_exists(self.fig.number):
+                plt.close(self.fig)
+
+            # CustomTkinter'in after olaylarını güvenli bir şekilde temizle
+            # Önce tüm widget'ları devre dışı bırak
+            if hasattr(self, 'title_bar'):
+                self.title_bar.pack_forget()
+
+            # Pencereyi yok etmeden önce tüm after olaylarını iptal et
+            try:
+                # Önce kaydedilen after ID'lerini iptal et
+                for after_id in self.after_ids:
+                    try:
+                        self.after_cancel(after_id)
+                    except Exception:
+                        pass
+
+                # Sonra tüm bekleyen after olaylarını iptal et
+                for after_id in self.tk.call('after', 'info'):
+                    try:
+                        self.after_cancel(after_id)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # Pencereyi yok et
+            self.quit()
+            self.destroy()
+        except Exception as e:
+            # Hata durumunda sessizce devam et ve pencereyi kapat
+            logging.error(f"Kapatma hatası: {e}")
+            try:
+                self.quit()
+                self.destroy()
+            except:
+                pass
+
+def safe_exit():
+    """Uygulamayı güvenli bir şekilde kapatır."""
+    try:
+        # Tüm matplotlib figürlerini kapat
+        plt.close('all')
+
+        # Bekleyen tüm işlemleri temizle
+        for thread in threading.enumerate():
+            if thread is not threading.current_thread() and thread.daemon:
+                try:
+                    thread._stop()
+                except:
+                    pass
+    except:
+        pass
+    finally:
+        # Uygulamadan çık
+        sys.exit(0)
 
 if __name__ == "__main__":
     try:
+        # Tkinter hata yönetimi için
+        def report_callback_exception(self, exc, val, tb):
+            logging.error(f"Tkinter callback hatası: {val}")
+
+        tk.Tk.report_callback_exception = report_callback_exception
+
         app = ModernFileComparator()
+        app.protocol("WM_DELETE_WINDOW", app.on_close)  # Pencere kapatıldığında on_close metodunu çağır
         app.mainloop()
     except KeyboardInterrupt:
         print("\nUygulama kullanıcı tarafından durduruldu.")
-        sys.exit(0)
+        safe_exit()
     except Exception as e:
         logging.error(f"Uygulama hatası: {e}")
-        messagebox.showerror("Kritik Hata", f"Uygulama hatası: {str(e)}")
-        sys.exit(1)
+        try:
+            messagebox.showerror("Kritik Hata", f"Uygulama hatası: {str(e)}")
+        except:
+            print(f"Kritik hata: {str(e)}")
+        safe_exit()
