@@ -1,0 +1,222 @@
+
+            <!DOCTYPE html>
+            <html lang="tr">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Dosya Karşılaştırma Raporu</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1, h2 { color: #2c3e50; }
+                    .header { background-color: #3498db; color: white; padding: 10px; border-radius: 5px; }
+                    .summary { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    tr:nth-child(even) { background-color: #f9f9f9; }
+                    .high { background-color: #a8e6cf; }
+                    .medium { background-color: #dcedc1; }
+                    .low { background-color: #ffd3b6; }
+                    .none { background-color: #ffaaa5; }
+                    .footer { margin-top: 30px; font-size: 0.8em; color: #7f8c8d; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Gelişmiş Dosya Karşılaştırma Raporu</h1>
+                    <p>Oluşturulma Tarihi: 16.04.2025 12:33:24</p>
+                </div>
+
+                <div class="summary">
+                    <h2>Rapor Özeti</h2>
+                    <p><strong>Klasör:</strong> doctst</p>
+                    <p><strong>Toplam Karşılaştırma:</strong> 15</p>
+                    <p><strong>Ortalama Benzerlik:</strong> 46.07%</p>
+                </div>
+
+                <h2>Karşılaştırma Sonuçları</h2>
+                <table>
+                    <tr>
+                        <th>Dosya 1</th>
+                        <th>Dosya 2</th>
+                        <th>Metadata</th>
+                        <th>Hash</th>
+                        <th>İçerik</th>
+                        <th>Yapı</th>
+                        <th>Toplam</th>
+                        <th>Sonuç</th>
+                    </tr>
+            
+                    <tr class="high">
+                        <td>File1.docx</td>
+                        <td>File1_Copy.docx</td>
+                        <td>100.0</td>
+                        <td>100.0</td>
+                        <td>100.0</td>
+                        <td>100.0</td>
+                        <td>100.0</td>
+                        <td>Tam Eşleşme</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1.docx</td>
+                        <td>File1_MajorChange.docx</td>
+                        <td>99.0</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>84.0</td>
+                        <td>57.3</td>
+                        <td>Orta Benzerlik</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1.docx</td>
+                        <td>File1_MinorChange.docx</td>
+                        <td>99.2</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>97.6</td>
+                        <td>60.8</td>
+                        <td>Yüksek Benzerlik</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1.docx</td>
+                        <td>File1_SaveAs.docx</td>
+                        <td>99.4</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>97.7</td>
+                        <td>60.8</td>
+                        <td>Yüksek Benzerlik</td>
+                    </tr>
+                
+                    <tr class="none">
+                        <td>File1.docx</td>
+                        <td>File2.docx</td>
+                        <td>0.9</td>
+                        <td>0.0</td>
+                        <td>0.9</td>
+                        <td>45.0</td>
+                        <td>11.7</td>
+                        <td>Benzerlik Yok</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1_Copy.docx</td>
+                        <td>File1_MajorChange.docx</td>
+                        <td>99.0</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>84.0</td>
+                        <td>57.3</td>
+                        <td>Orta Benzerlik</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1_Copy.docx</td>
+                        <td>File1_MinorChange.docx</td>
+                        <td>99.2</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>97.6</td>
+                        <td>60.8</td>
+                        <td>Yüksek Benzerlik</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1_Copy.docx</td>
+                        <td>File1_SaveAs.docx</td>
+                        <td>99.4</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>97.7</td>
+                        <td>60.8</td>
+                        <td>Yüksek Benzerlik</td>
+                    </tr>
+                
+                    <tr class="none">
+                        <td>File1_Copy.docx</td>
+                        <td>File2.docx</td>
+                        <td>0.9</td>
+                        <td>0.0</td>
+                        <td>0.9</td>
+                        <td>45.0</td>
+                        <td>11.7</td>
+                        <td>Benzerlik Yok</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1_MajorChange.docx</td>
+                        <td>File1_MinorChange.docx</td>
+                        <td>98.2</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>85.6</td>
+                        <td>57.6</td>
+                        <td>Orta Benzerlik</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1_MajorChange.docx</td>
+                        <td>File1_SaveAs.docx</td>
+                        <td>98.3</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>85.4</td>
+                        <td>57.6</td>
+                        <td>Orta Benzerlik</td>
+                    </tr>
+                
+                    <tr class="none">
+                        <td>File1_MajorChange.docx</td>
+                        <td>File2.docx</td>
+                        <td>0.9</td>
+                        <td>0.0</td>
+                        <td>0.9</td>
+                        <td>42.9</td>
+                        <td>11.1</td>
+                        <td>Benzerlik Yok</td>
+                    </tr>
+                
+                    <tr class="low">
+                        <td>File1_MinorChange.docx</td>
+                        <td>File1_SaveAs.docx</td>
+                        <td>99.9</td>
+                        <td>5.0</td>
+                        <td>70.0</td>
+                        <td>99.7</td>
+                        <td>61.4</td>
+                        <td>Yüksek Benzerlik</td>
+                    </tr>
+                
+                    <tr class="none">
+                        <td>File1_MinorChange.docx</td>
+                        <td>File2.docx</td>
+                        <td>0.9</td>
+                        <td>0.0</td>
+                        <td>0.9</td>
+                        <td>42.9</td>
+                        <td>11.1</td>
+                        <td>Benzerlik Yok</td>
+                    </tr>
+                
+                    <tr class="none">
+                        <td>File1_SaveAs.docx</td>
+                        <td>File2.docx</td>
+                        <td>0.9</td>
+                        <td>0.0</td>
+                        <td>0.9</td>
+                        <td>42.7</td>
+                        <td>11.1</td>
+                        <td>Benzerlik Yok</td>
+                    </tr>
+                
+                </table>
+
+                <div class="footer">
+                    <p>Bu rapor Gelişmiş Dosya Karşılaştırıcı v5.1 tarafından oluşturulmuştur.</p>
+                </div>
+            </body>
+            </html>
+            
