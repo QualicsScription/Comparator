@@ -273,12 +273,15 @@ class SolidWorksAnalyzer:
             asm_info = self._check_assembly_relation(file1, file2)
 
             # Hash kontrolü
+            hash_sim = 0.0
             if self._compare_hash(file1, file2):
+                hash_sim = 100.0
                 return self._create_exact_match()
 
             # Binary karşılaştırma
             binary_sim = self._compare_binary(file1, file2)
             if binary_sim > 0.995:  # %99.5 üzeri benzerlik
+                hash_sim = 99.5
                 return self._create_exact_match()
 
             # Detaylı analiz
@@ -295,7 +298,13 @@ class SolidWorksAnalyzer:
                 return self._create_save_as_match()
 
             # Montaj bonusu
+            assembly_bonus = None
             if asm_info['same_assembly']:
+                # Orijinal değerleri sakla
+                original_structure = structure_sim
+                original_content = content_sim
+
+                # Bonusları uygula
                 structure_sim *= 1.2  # %20 bonus
                 content_sim *= 1.1    # %10 bonus
 
@@ -303,33 +312,33 @@ class SolidWorksAnalyzer:
                 assembly_bonus = {
                     'structure_bonus': 20,
                     'content_bonus': 10,
+                    'original_structure': original_structure,
+                    'original_content': original_content,
                     'assembly_name': asm_info['assembly_name'],
                     'common_refs': asm_info['common_refs']
                 }
 
             # Final skor hesaplama
-            total_score = (
-                metadata_sim * self.weights['metadata'] +
-                content_sim * self.weights['content'] +
-                structure_sim * self.weights['structure']
-            )
+            result = self._calculate_final_score(metadata_sim, hash_sim, content_sim, structure_sim)
 
-            result = {
-                'score': min(100, total_score),  # 100'den büyük olamaz
-                'details': {
-                    'feature_tree': structure_sim,
-                    'sketch_data': content_sim,
-                    'geometry': metadata_sim
-                },
-                'match': total_score > 95,
-                'type': 'solidworks',
-                'size_similarity': min(os.path.getsize(file1), os.path.getsize(file2)) / \
-                                  max(os.path.getsize(file1), os.path.getsize(file2)) * 100
-            }
+            # Benzerlik değerlendirmesi
+            similarity_category = self._categorize_similarity(result['score'])
+            similarity_description = self._evaluate_similarity(metadata_sim, content_sim, structure_sim)
 
-            # Montaj bilgilerini ekle
+            # Montaj bonusu uygula
             if asm_info['same_assembly']:
+                # Montaj bonusu ile skor güncelleme
+                final_score = self._apply_assembly_bonus(result['score'], file1, file2)
+                result['score'] = final_score
                 result['assembly_relation'] = assembly_bonus
+                result['assembly_bonus_applied'] = True
+
+            # Ek bilgileri ekle
+            result['type'] = 'solidworks'
+            result['size_similarity'] = min(os.path.getsize(file1), os.path.getsize(file2)) / \
+                                      max(os.path.getsize(file1), os.path.getsize(file2)) * 100
+            result['similarity_category'] = similarity_category
+            result['similarity_description'] = similarity_description
 
             return result
 
@@ -391,10 +400,11 @@ class SolidWorksAnalyzer:
 
     def _is_save_as(self, metadata_sim, content_sim, structure_sim):
         """SaveAs kontrolü"""
+        # SaveAs kriterleri güncellendi
         return (
-            metadata_sim > 90 and    # Metadata çok benzer
-            content_sim > 50 and     # İçerik benzer
-            structure_sim > 40       # Yapı benzer
+            metadata_sim > 60 and    # Metadata benzer olmalı
+            content_sim > 90 and     # Geometri neredeyse aynı olmalı
+            structure_sim > 10       # Yapı biraz benzer olmalı
         )
 
     def _is_save_as_copy(self, file1, file2, data1, data2):
@@ -423,6 +433,73 @@ class SolidWorksAnalyzer:
             )
         except Exception as e:
             logging.error(f"SaveAs kontrolü hatası: {e}")
+            return False
+
+    def _create_save_as_match(self):
+        """SaveAs eşleşme sonucu"""
+        return {
+            'score': 95.0,
+            'details': {
+                'metadata': 95.0,
+                'hash': 0.0,
+                'content': 95.0,
+                'structure': 90.0
+            },
+            'match': True,
+            'type': 'save_as'
+        }
+
+    def _categorize_similarity(self, score):
+        """Benzerlik kategorisini belirle"""
+        if score >= 99:
+            return "Tam Eşleşme"
+        elif score >= 90:
+            return "SaveAs Kopyası"
+        elif score >= 70:
+            return "Küçük Değişiklikler"
+        elif score >= 40:
+            return "Büyük Değişiklikler"
+        elif score >= 20:
+            return "Az Benzer"
+        else:
+            return "Farklı Dosyalar"
+
+    def _evaluate_similarity(self, metadata_sim, content_sim, structure_sim):
+        """Benzerlik değerlendirmesi"""
+        if content_sim > 95:  # Geometri neredeyse aynı
+            if metadata_sim > 90:  # Metadata da çok benzer
+                return "SaveAs ile oluşturulmuş"
+            elif structure_sim > 40:  # Yapı kısmen benzer
+                return "Farklı yöntemle oluşturulmuş benzer parça"
+            else:
+                return "Benzer geometri, farklı oluşturma yöntemi"
+        else:
+            if structure_sim > 70:
+                return "Benzer yapı, farklı geometri"
+            elif metadata_sim > 90:
+                return "Benzer kaynak, farklı parça"
+            else:
+                return "Farklı parçalar"
+
+    def _apply_assembly_bonus(self, score, file1, file2):
+        """Montaj ilişkisi bonusu"""
+        try:
+            # Aynı montajdan gelen parçalar için bonus
+            if self._are_in_same_assembly(file1, file2):
+                return min(100, score * 1.15)  # %15 bonus
+            return score
+        except Exception as e:
+            logging.error(f"Montaj bonusu uygulama hatası: {e}")
+            return score
+
+    def _are_in_same_assembly(self, file1, file2):
+        """Aynı montajda mı kontrolü"""
+        try:
+            # Montaj ilişkilerini kontrol et
+            asm_info = self._check_assembly_relation(file1, file2)
+            return asm_info['same_assembly']
+        except Exception as e:
+            logging.error(f"Montaj kontrolü hatası: {e}")
             return False
 
     def _compare_hash(self, file1, file2):
@@ -773,28 +850,34 @@ class SolidWorksAnalyzer:
             bbox_sim * weights['bbox']
         ) * 100
 
-    def _calculate_final_score(self, feature_sim, sketch_sim, geom_sim):
+    def _calculate_final_score(self, metadata_sim, hash_sim, content_sim, structure_sim):
         """Final skor hesaplama"""
         weights = {
-            'feature': 0.35,  # Feature ağacı önemli
-            'sketch': 0.25,   # Sketch data orta önemli
-            'geometry': 0.40  # Geometri en önemli
+            'metadata': 0.20,    # Metadata önemli ama kritik değil
+            'hash': 0.10,        # Hash eşleşmesi bonus gibi
+            'content': 0.40,     # İçerik (geometri) en önemli
+            'structure': 0.30    # Yapı önemli ama içerik kadar değil
         }
 
         # Temel skor
         base_score = (
-            feature_sim * weights['feature'] +
-            sketch_sim * weights['sketch'] +
-            geom_sim * weights['geometry']
+            metadata_sim * weights['metadata'] +
+            hash_sim * weights['hash'] +
+            content_sim * weights['content'] +
+            structure_sim * weights['structure']
         )
 
-        # Geometri çok benzerse bonus
-        if geom_sim > 95:
-            base_score *= 1.1  # %10 bonus
+        # Geometri bonusu (content_sim geometriyi temsil ediyor)
+        geometry_bonus = 1.0
+        if content_sim > 95:
+            geometry_bonus = 1.2  # %20 bonus
+            base_score *= geometry_bonus
 
-        # Feature tree çok benzerse bonus
-        if feature_sim > 90:
-            base_score *= 1.05  # %5 bonus
+        # Hash bonusu
+        hash_bonus = False
+        if hash_sim == 100:
+            hash_bonus = True
+            base_score = 100  # Tam eşleşme
 
         # Final skor (maximum 100)
         final_score = min(100, base_score)
@@ -802,12 +885,13 @@ class SolidWorksAnalyzer:
         return {
             'score': final_score,
             'details': {
-                'feature_tree': feature_sim,
-                'sketch_data': sketch_sim,
-                'geometry': geom_sim,
+                'metadata': metadata_sim,
+                'hash': hash_sim,
+                'content': content_sim,
+                'structure': structure_sim,
                 'base_score': base_score,
-                'geometry_bonus': 1.1 if geom_sim > 95 else 1.0,
-                'feature_bonus': 1.05 if feature_sim > 90 else 1.0
+                'geometry_bonus': geometry_bonus,
+                'hash_bonus': hash_bonus
             },
             'match': final_score > 99
         }
