@@ -163,14 +163,89 @@ class SWFileParser:
             logging.error(f"Geometri istatistikleri çıkarma hatası: {e}")
             return {'signature': b'', 'data_size': 0, 'volume': 1.0}
 
+    def get_assembly_references(self, file_path):
+        """Montaj referanslarını çıkar"""
+        try:
+            # Dosya uzantısını kontrol et
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext not in ['.sldprt', '.sldasm', '.slddrw']:
+                return []
+
+            # Dosyayı binary modda aç
+            with open(file_path, 'rb') as f:
+                data = f.read()
+
+                # Montaj referanslarını ara
+                references = []
+
+                # Referans marker'ları
+                markers = [b'ASSY', b'REF', b'COMP']
+
+                # Her marker için arama yap
+                for marker in markers:
+                    pos = 0
+                    while True:
+                        pos = data.find(marker, pos)
+                        if pos == -1:
+                            break
+
+                        # Referans ID'sini çıkarmaya çalış
+                        try:
+                            # Marker'dan sonraki 20 byte'a bak
+                            ref_data = data[pos:pos+100]
+
+                            # ASCII karakterleri bul
+                            ascii_chars = []
+                            for i in range(len(ref_data)):
+                                if 32 < ref_data[i] < 127:  # Yazdırılabilir ASCII
+                                    ascii_chars.append(chr(ref_data[i]))
+
+                            # ASCII karakterleri birleştir
+                            ref_id = ''.join(ascii_chars)
+
+                            # Geçerli bir referans ID'si ise ekle
+                            if len(ref_id) > 3 and not ref_id.isdigit():
+                                references.append(ref_id)
+                        except:
+                            pass
+
+                        pos += len(marker)
+
+                # Benzersiz referansları döndür
+                return list(set(references))
+        except Exception as e:
+            logging.error(f"Montaj referansları çıkarma hatası: {e}")
+            return []
+
 class SolidWorksAnalyzer:
     def __init__(self):
         self.parser = SWFileParser()
         self.binary_cache = {}  # Binary veri önbelleği
 
+    def _check_assembly_relations(self, file_path):
+        """Dosyanın montaj ilişkilerini kontrol eder"""
+        try:
+            # Montaj referanslarını bul
+            assembly_refs = self.parser.get_assembly_references(file_path)
+
+            # Montaj içi parça mı?
+            is_in_assembly = len(assembly_refs) > 0
+
+            return {
+                'is_in_assembly': is_in_assembly,
+                'references': assembly_refs
+            }
+        except Exception as e:
+            logging.error(f"Montaj ilişkileri kontrol hatası: {e}")
+            return {'is_in_assembly': False, 'references': []}
+
     def compare(self, file1, file2):
         """İki SolidWorks dosyasını karşılaştırır"""
         try:
+            # Montaj ilişkilerini kontrol et
+            asm1 = self._check_assembly_relations(file1)
+            asm2 = self._check_assembly_relations(file2)
+
             # Hash kontrolü (birebir aynı dosyalar için)
             if self._compare_hash(file1, file2):
                 return self._create_perfect_match()
@@ -198,6 +273,26 @@ class SolidWorksAnalyzer:
             result['type'] = 'solidworks'  # Tip bilgisini ekle
             result['size_similarity'] = min(os.path.getsize(file1), os.path.getsize(file2)) / \
                                       max(os.path.getsize(file1), os.path.getsize(file2)) * 100
+
+            # Aynı montajdan gelen parçalar için benzerlik skorunu artır
+            assembly_bonus = 0
+            if asm1['is_in_assembly'] and asm2['is_in_assembly']:
+                # Ortak referansları bul
+                common_refs = set(asm1['references']) & set(asm2['references'])
+                if common_refs:  # Ortak referanslar varsa
+                    assembly_bonus = 10  # %10 bonus
+                    # Montaj bilgilerini sonuç sözlüğüne ekle
+                    result['assembly_relation'] = {
+                        'common_refs': list(common_refs),
+                        'bonus': assembly_bonus
+                    }
+
+            # Montaj bonusunu ekle
+            if assembly_bonus > 0:
+                result['score'] = min(100, result['score'] + assembly_bonus)
+                # Detay bilgilerini güncelle
+                result['details']['assembly_bonus'] = assembly_bonus
+
             return result
 
         except Exception as e:
