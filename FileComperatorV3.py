@@ -1642,42 +1642,7 @@ class FileComparator:
                 'error': str(e)
             }
 
-class FileTypeSelector(ctk.CTkFrame):
-    def __init__(self, parent, command=None):
-        super().__init__(parent)
-        self.command = command
-        self.selected_type = ctk.StringVar(value="cad")  # Varsayılan CAD
-        self.setup_buttons()
-
-    def setup_buttons(self):
-        types = {
-            'cad': 'CAD/SolidWorks',
-            'document': 'Döküman',
-            'image': 'Görsel',
-            'all': 'Tüm Dosyalar'
-        }
-
-        for i, (value, text) in enumerate(types.items()):
-            btn = ctk.CTkRadioButton(
-                self,
-                text=text,
-                value=value,
-                variable=self.selected_type,
-                command=self._on_select,
-                corner_radius=0,
-                border_width_checked=0,
-                border_width_unchecked=0,
-                fg_color="#1a237e",
-                hover_color="#283593"
-            )
-            btn.grid(row=0, column=i, padx=5, pady=5, sticky="w")
-
-    def _on_select(self):
-        if self.command:
-            self.command(self.selected_type.get())
-
-    def get_selected(self):
-        return self.selected_type.get()
+# FileTypeSelector sınıfı kaldırıldı - otomatik dosya tipi tespiti kullanılıyor
 
 
 class ModernFileComparator(ctk.CTk):
@@ -1686,13 +1651,20 @@ class ModernFileComparator(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Windows başlık çubuğunu gizle
-        self.overrideredirect(True)
-
         # Pencere ayarları
         self.title(f"Gelişmiş Dosya Karşılaştırıcı v{__version__}")
         self.geometry("1400x800")
         self.minsize(1200, 700)
+
+        # Windows görev çubuğunda göstermek için
+        try:
+            # İkon dosyası varsa ayarla
+            self.iconbitmap("icon.ico")
+        except:
+            pass
+
+        # Windows başlık çubuğunu gizle
+        self.overrideredirect(True)
 
         # Tema ayarları
         self.setup_theme()
@@ -1732,18 +1704,38 @@ class ModernFileComparator(ctk.CTk):
         button_frame = ctk.CTkFrame(self.title_bar, fg_color="transparent")
         button_frame.pack(side=tk.RIGHT)
 
-        # Pencere kontrol butonları
-        minimize_btn = ctk.CTkButton(button_frame, text="─", width=30, height=30,
-                                    command=self.minimize_window)
+        # Pencere kontrol butonları - Windows stili
+        minimize_btn = ctk.CTkButton(
+            button_frame,
+            text="─",
+            width=30,
+            height=30,
+            fg_color="#1a237e",
+            hover_color="#283593",
+            command=self.minimize_window
+        )
         minimize_btn.pack(side=tk.LEFT, padx=2)
 
-        maximize_btn = ctk.CTkButton(button_frame, text="□", width=30, height=30,
-                                    command=self.toggle_maximize)
+        maximize_btn = ctk.CTkButton(
+            button_frame,
+            text="□",
+            width=30,
+            height=30,
+            fg_color="#1a237e",
+            hover_color="#283593",
+            command=self.toggle_maximize
+        )
         maximize_btn.pack(side=tk.LEFT, padx=2)
 
-        close_btn = ctk.CTkButton(button_frame, text="✕", width=30, height=30,
-                                 fg_color="#ff5555", hover_color="#ff3333",
-                                 command=self.on_close)
+        close_btn = ctk.CTkButton(
+            button_frame,
+            text="✕",
+            width=30,
+            height=30,
+            fg_color="#e81123",  # Windows kırmızı
+            hover_color="#f1707a",
+            command=self.on_close
+        )
         close_btn.pack(side=tk.LEFT, padx=2)
 
         # Başlık çubuğunda sürükleme
@@ -1751,18 +1743,25 @@ class ModernFileComparator(ctk.CTk):
         self.title_bar.bind("<ButtonRelease-1>", self.stop_move)
         self.title_bar.bind("<B1-Motion>", self.on_move)
 
+        # Çift tıklama ile tam ekran
+        self.title_bar.bind("<Double-1>", lambda e: self.toggle_maximize())
+
+        # Windows görev çubuğunda göstermek için
+        try:
+            self.iconbitmap(default="icon.ico")  # Eğer icon.ico dosyası varsa
+        except:
+            pass  # İkon dosyası yoksa sessizce devam et
+
     def minimize_window(self):
         """Pencereyi simge durumuna küçült"""
-        self.withdraw()
-        # Görev çubuğunda göster
-        self.wm_state('iconic')
-        # 100ms sonra tekrar göster
-        after_id = self.after(100, self.show_window)
-        self.after_ids.append(after_id)
+        # Windows'ta overrideredirect ile küçültme için
+        self.overrideredirect(False)  # Geçici olarak başlık çubuğunu göster
+        self.iconify()  # Simge durumuna küçült
 
     def show_window(self):
         """Pencereyi göster"""
         self.deiconify()
+        self.overrideredirect(True)  # Başlık çubuğunu tekrar gizle
         self.state('normal')
 
     def toggle_maximize(self):
@@ -1808,6 +1807,29 @@ class ModernFileComparator(ctk.CTk):
         # Tema uygula
         ctk.set_default_color_theme("blue")  # Özel tema yerine şimdilik blue kullanıyoruz
 
+        # Radio butonlar için dark tema
+        self.setup_radio_buttons()
+
+    def setup_radio_buttons(self):
+        """Radio butonları oluştur"""
+        style = ttk.Style()
+
+        # Radio button stili
+        style.configure(
+            "Custom.TRadiobutton",
+            background="#2b2b2b",
+            foreground="white",
+            indicatorcolor="#1a237e",
+            indicatorbackground="#2b2b2b"
+        )
+
+        # Seçili durum
+        style.map(
+            "Custom.TRadiobutton",
+            background=[('active', '#1a237e'), ('selected', '#1a237e')],
+            foreground=[('active', 'white'), ('selected', 'white')]
+        )
+
     def create_button(self, parent, text, command):
         """Özel buton oluştur"""
         btn = ctk.CTkButton(
@@ -1845,13 +1867,11 @@ class ModernFileComparator(ctk.CTk):
         self.folder_path.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         ctk.CTkButton(control_frame, text="📁 Gözat", command=self.browse_folder, width=100).grid(row=0, column=2, padx=5)
 
-        # Dosya tipi seçimi
-        self.file_type_selector = FileTypeSelector(control_frame, command=self.on_file_type_change)
-        self.file_type_selector.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky="w")
+        # Dosya tipi seçimi kaldırıldı - otomatik tanıma kullanılıyor
 
-        # Minimum benzerlik
+        # Minimum benzerlik - en sağda
         filter_frame = ctk.CTkFrame(control_frame)
-        filter_frame.grid(row=1, column=4, padx=5, pady=5, sticky="e")
+        filter_frame.grid(row=0, column=4, padx=5, pady=5, sticky="e")
         ctk.CTkLabel(filter_frame, text="Min. Benzerlik:").pack(side="left", padx=5)
 
         self.min_similarity = ctk.CTkEntry(filter_frame, width=50)
@@ -1868,8 +1888,15 @@ class ModernFileComparator(ctk.CTk):
         self.status_var = ctk.StringVar(value="Hazır")
         ctk.CTkLabel(main_frame, textvariable=self.status_var).pack(pady=5)
 
-        # Sonuçlar paneli
-        self.notebook = ctk.CTkTabview(main_frame)
+        # Sonuçlar paneli - dark tema için sekme yazılarını görünür yapma
+        self.notebook = ctk.CTkTabview(
+            main_frame,
+            segmented_button_fg_color="#1a237e",     # Sekme arkaplan rengi
+            segmented_button_selected_color="#3949ab", # Seçili sekme rengi
+            segmented_button_unselected_color="#1a237e", # Seçili olmayan sekme rengi
+            segmented_button_selected_hover_color="#3949ab", # Seçili sekme hover rengi
+            segmented_button_unselected_hover_color="#283593" # Seçili olmayan sekme hover rengi
+        )
         self.notebook.pack(fill=tk.BOTH, expand=True, pady=10)
 
         # Tablo görünümü
@@ -1884,23 +1911,70 @@ class ModernFileComparator(ctk.CTk):
         self.detail_tab = self.notebook.add("Detaylı Analiz")
         self.setup_detail_panel()
 
-        # Butonlar
+        # Butonlar - ortalı ve esnek
         button_frame = ctk.CTkFrame(main_frame)
         button_frame.pack(pady=10, fill=tk.X)
 
-        ctk.CTkButton(button_frame, text="▶️ Başlat", command=self.start_comparison).grid(row=0, column=0, padx=5)
-        ctk.CTkButton(button_frame, text="⏹ Durdur", command=self.stop_comparison).grid(row=0, column=1, padx=5)
-        ctk.CTkButton(button_frame, text="🗑️ Temizle", command=self.clear_results).grid(row=0, column=2, padx=5)
-        ctk.CTkButton(button_frame, text="📊 Rapor", command=self.generate_report).grid(row=0, column=3, padx=5)
-        ctk.CTkButton(button_frame, text="💾 CSV", command=self.export_results).grid(row=0, column=4, padx=5)
+        # Buton çerçevesini esnek hale getir
+        button_frame.columnconfigure(0, weight=1)  # Sol boşluk
+        button_frame.columnconfigure(6, weight=1)  # Sağ boşluk
 
-        # Yardım butonu
-        help_btn = ctk.CTkButton(button_frame, text="?", width=30, height=30,
-                                command=self.show_help)
-        help_btn.grid(row=0, column=5, padx=5)
+        # Orta kısımdaki butonlar için ağırlık yok (weight=0)
+        for i in range(1, 6):
+            button_frame.columnconfigure(i, weight=0)
+
+        # Başlat butonu
+        start_btn = self.create_button(button_frame, "▶️ Başlat", self.start_comparison)
+        start_btn.grid(row=0, column=1, padx=5)
+
+        # Durdur butonu
+        stop_btn = self.create_button(button_frame, "⏹ Durdur", self.stop_comparison)
+        stop_btn.grid(row=0, column=2, padx=5)
+
+        # Temizle butonu
+        clear_btn = self.create_button(button_frame, "🗑️ Temizle", self.clear_results)
+        clear_btn.grid(row=0, column=3, padx=5)
+
+        # Rapor butonu
+        report_btn = self.create_button(button_frame, "📊 Rapor", self.generate_report)
+        report_btn.grid(row=0, column=4, padx=5)
+
+        # CSV butonu
+        csv_btn = self.create_button(button_frame, "💾 CSV", self.export_results)
+        csv_btn.grid(row=0, column=5, padx=5)
+
+        # Yardım butonu - en sağda
+        help_btn = self.create_button(button_frame, "?", self.show_help)
+        help_btn.configure(width=30, height=30)
+        help_btn.grid(row=0, column=7, padx=5, sticky="e")
 
     def setup_table_view(self):
         """Sonuç tablosunu oluşturur."""
+        style = ttk.Style()
+
+        # Dark tema için tablo stilleri
+        style.configure(
+            "Treeview",
+            background="#2b2b2b",
+            foreground="white",
+            fieldbackground="#2b2b2b",
+            borderwidth=0
+        )
+
+        # Seçili satır stili
+        style.map('Treeview',
+            background=[('selected', '#1a237e')],
+            foreground=[('selected', 'white')]
+        )
+
+        # Header stili
+        style.configure(
+            "Treeview.Heading",
+            background="#1a237e",
+            foreground="white",
+            borderwidth=0
+        )
+
         columns = ('Dosya 1', 'Dosya 2', 'Metadata', 'Hash', 'İçerik', 'Yapı', 'Toplam', 'Sonuç')
         self.tree = ttk.Treeview(self.table_tab, columns=columns, show='headings')
 
@@ -1909,11 +1983,11 @@ class ModernFileComparator(ctk.CTk):
             self.tree.heading(col, text=col, command=lambda c=col: self.sort_treeview(c))
             self.tree.column(col, width=100 if col not in ['Dosya 1', 'Dosya 2', 'Sonuç'] else 150)
 
-        # Renk etiketleri
-        self.tree.tag_configure('high', background='#a8e6cf')
-        self.tree.tag_configure('medium', background='#dcedc1')
-        self.tree.tag_configure('low', background='#ffd3b6')
-        self.tree.tag_configure('none', background='#ffaaa5')
+        # Renk etiketleri - dark tema için daha koyu renkler
+        self.tree.tag_configure('high', background='#1a4731')   # Koyu yeşil
+        self.tree.tag_configure('medium', background='#2d4d1a') # Koyu yeşil-sarı
+        self.tree.tag_configure('low', background='#4d3319')    # Koyu turuncu
+        self.tree.tag_configure('none', background='#4d1a1a')   # Koyu kırmızı
 
         # Kaydırma çubukları
         vsb = ttk.Scrollbar(self.table_tab, orient="vertical", command=self.tree.yview)
@@ -1933,13 +2007,43 @@ class ModernFileComparator(ctk.CTk):
 
     def setup_visual_analysis(self):
         """Görsel analiz panelini oluşturur."""
-        self.fig, self.ax = plt.subplots(figsize=(6, 4))
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.visual_tab)
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Ana çerçeve - esnek düzen için
+        visual_frame = ctk.CTkFrame(self.visual_tab)
+        visual_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # İstatistikler metin kutusu
-        self.stats_text = ctk.CTkTextbox(self.visual_tab, wrap="word", height=150)
-        self.stats_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Üst kısım için grafik
+        graph_frame = ctk.CTkFrame(visual_frame)
+        graph_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Dark tema için matplotlib ayarları
+        plt.style.use('dark_background')
+        self.fig, self.ax = plt.subplots(figsize=(6, 4))
+        self.fig.patch.set_facecolor('#2b2b2b')  # Arkaplan rengi
+        self.ax.set_facecolor('#2b2b2b')         # Grafik arkaplan rengi
+
+        # Metin renklerini ayarla
+        self.ax.tick_params(colors='white')
+        for spine in self.ax.spines.values():
+            spine.set_edgecolor('white')
+
+        # Canvas oluştur - esnek boyut
+        self.canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
+        canvas_widget = self.canvas.get_tk_widget()
+        canvas_widget.pack(fill=tk.BOTH, expand=True)
+
+        # Alt kısım için istatistikler
+        stats_frame = ctk.CTkFrame(visual_frame)
+        stats_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        # İstatistikler metin kutusu - dark tema
+        self.stats_text = ctk.CTkTextbox(
+            stats_frame,
+            wrap="word",
+            height=150,
+            fg_color="#2b2b2b",
+            text_color="white"
+        )
+        self.stats_text.pack(fill=tk.BOTH, expand=True)
 
     def setup_detail_panel(self):
         """Detaylı analiz panelini oluşturur."""
@@ -1975,10 +2079,7 @@ class ModernFileComparator(ctk.CTk):
             self.folder_path.delete(0, "end")
             self.folder_path.insert(0, folder)
 
-    def on_file_type_change(self, file_type):
-        """Dosya tipi değiştiğinde çağrılır"""
-        logging.info(f"Dosya tipi değişti: {file_type}")
-        # Burada dosya tipine göre ek işlemler yapılabilir
+    # on_file_type_change metodu kaldırıldı - otomatik dosya tipi tespiti kullanılıyor
 
     def start_comparison(self):
         """Karşılaştırma işlemini başlatır."""
@@ -1998,6 +2099,24 @@ class ModernFileComparator(ctk.CTk):
         # Ayrı bir thread'de karşılaştırma başlat
         threading.Thread(target=self.run_comparison, args=(folder,), daemon=True).start()
 
+    def detect_file_type(self, file_path):
+        """Dosya tipini otomatik tespit et"""
+        ext = os.path.splitext(file_path)[1].lower()
+
+        # SolidWorks/CAD dosyaları
+        if ext in ['.sldprt', '.sldasm', '.slddrw', '.step', '.stp', '.iges', '.igs']:
+            return 'cad'
+
+        # Döküman dosyaları
+        elif ext in ['.doc', '.docx', '.pdf', '.txt']:
+            return 'document'
+
+        # Görsel dosyaları
+        elif ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']:
+            return 'image'
+
+        return None
+
     def run_comparison(self, folder):
         """Klasördeki dosyaları karşılaştırır."""
         try:
@@ -2005,12 +2124,11 @@ class ModernFileComparator(ctk.CTk):
             after_id = self.after(0, lambda: self.status_var.set("Dosyalar taraniyor ve hazırlanıyor..."))
             self.after_ids.append(after_id)
 
-            file_type = self.file_type_selector.get_selected()  # Seçilen dosya tipi
             min_similarity = int(self.min_similarity.get())
-            extensions = self.comparator.supported_extensions[file_type]
 
             # Klasördeki dosyaları listele
             all_files = []
+            file_types = {}  # Dosya yolları ve tipleri
 
             # Dosya listesini oluştururken UI'yi güncelle
             after_id = self.after(0, lambda: self.status_var.set("Dosyalar listeleniyor..."))
@@ -2018,8 +2136,11 @@ class ModernFileComparator(ctk.CTk):
 
             for f in os.listdir(folder):
                 file_path = os.path.join(folder, f)
-                if os.path.isfile(file_path) and (not extensions or os.path.splitext(f)[1].lower() in extensions):
-                    all_files.append(f)
+                if os.path.isfile(file_path):
+                    file_type = self.detect_file_type(file_path)
+                    if file_type:  # Desteklenen bir dosya tipi ise
+                        all_files.append(f)
+                        file_types[file_path] = file_type
 
                     # Her 10 dosyada bir UI'yi güncelle
                     if len(all_files) % 10 == 0:

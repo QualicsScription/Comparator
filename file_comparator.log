@@ -142,3 +142,37 @@
 2025-04-24 15:38:58,603 - INFO - Dosya tipi de\u011fi\u015fti: cad
 2025-04-24 15:39:00,083 - INFO - Dosya tipi de\u011fi\u015fti: cad
 2025-04-24 15:39:11,018 - ERROR - Tkinter callback hatas\u0131: can't iconify ".": override-redirect flag is set
+2025-04-24 15:41:40,732 - INFO - Dosya tipi de\u011fi\u015fti: document
+2025-04-24 15:41:40,923 - INFO - Dosya tipi de\u011fi\u015fti: document
+2025-04-24 15:41:41,604 - INFO - Dosya tipi de\u011fi\u015fti: image
+2025-04-24 15:41:41,755 - INFO - Dosya tipi de\u011fi\u015fti: image
+2025-04-24 15:41:42,044 - INFO - Dosya tipi de\u011fi\u015fti: all
+2025-04-24 15:41:42,219 - INFO - Dosya tipi de\u011fi\u015fti: all
+2025-04-24 15:41:42,659 - INFO - Dosya tipi de\u011fi\u015fti: all
+2025-04-24 15:41:42,819 - INFO - Dosya tipi de\u011fi\u015fti: all
+2025-04-24 15:43:00,684 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:44:17,694 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:45:33,563 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:46:21,256 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:46:40,071 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:46:40,088 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:48:44,718 - ERROR - Tkinter callback hatas\u0131: can't iconify ".": override-redirect flag is set
+2025-04-24 15:51:22,343 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 15:58:16,659 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:59:33,702 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:00:49,882 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:01:37,681 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:01:56,859 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:01:56,877 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:05:45,409 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 16:05:55,090 - ERROR - Tkinter callback hatas\u0131: can't iconify ".": override-redirect flag is set
+2025-04-24 16:12:42,801 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 16:16:23,416 - ERROR - Uygulama hatas\u0131: ['segmented_button_text_color', 'segmented_button_selected_text_color'] are not supported arguments. Look at the documentation for supported arguments.
+2025-04-24 16:17:23,000 - ERROR - Uygulama hatas\u0131: ['segmented_button_text_color', 'segmented_button_selected_text_color'] are not supported arguments. Look at the documentation for supported arguments.
+2025-04-24 16:17:36,093 - ERROR - Uygulama hatas\u0131: ['segmented_button_text_color', 'segmented_button_selected_text_color'] are not supported arguments. Look at the documentation for supported arguments.
+2025-04-24 16:20:29,729 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:21:44,872 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:22:58,796 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:23:44,926 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:24:03,774 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:24:03,793 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
