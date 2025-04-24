@@ -109,3 +109,10 @@
 2025-04-22 09:34:47,346 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
 2025-04-22 09:34:47,366 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
 2025-04-22 09:35:05,344 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-22 09:43:02,605 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-22 09:44:19,437 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-22 09:45:34,543 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-22 09:46:21,977 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-22 09:46:40,749 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-22 09:46:40,767 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-22 13:22:50,533 - ERROR - Kapatma hatas\u0131: can't delete Tcl command

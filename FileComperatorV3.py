@@ -21,7 +21,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import customtkinter as ctk
 
 # Yeni SolidWorks Analyzer'ı içe aktar
-from SolidWorksAnalyzerV2 import SolidWorksAnalyzer
+from SolidWorksAnalyzerV3 import SolidWorksAnalyzer
 
 # Uygulama sürümü
 __version__ = "2.0.0"
@@ -1329,7 +1329,8 @@ class FileComparator:
                     'content': content_sim,
                     'structure': structure_sim
                 },
-                'similarity_category': sw_result.get('similarity_category', 'Bilinmiyor')
+                'similarity_category': sw_result.get('similarity_category', 'Bilinmiyor'),
+                'evaluation': sw_result.get('evaluation', '')
             }
         except Exception as e:
             logging.error(f"SolidWorks karşılaştırma hatası: {e}")
@@ -1548,7 +1549,8 @@ class FileComparator:
                     'content': details.get('content', 0),
                     'structure': details.get('structure', 0),
                     'type': 'solidworks',
-                    'similarity_category': sw_result.get('similarity_category', 'Bilinmiyor')
+                    'similarity_category': sw_result.get('similarity_category', 'Bilinmiyor'),
+                    'evaluation': sw_result.get('evaluation', '')
                 }
             else:
                 result = self.general_comparator.compare(file1, file2)
