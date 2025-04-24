@@ -116,3 +116,29 @@
 2025-04-22 09:46:40,749 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
 2025-04-22 09:46:40,767 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
 2025-04-22 13:22:50,533 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 15:12:07,823 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:13:25,393 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:14:40,857 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:15:28,697 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:15:47,407 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:15:47,425 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:16:09,078 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 15:21:37,212 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:22:53,924 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:24:09,154 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:24:56,481 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:25:15,245 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:25:15,263 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 15:26:09,190 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 15:29:36,376 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 15:38:35,371 - INFO - Dosya tipi de\u011fi\u015fti: cad
+2025-04-24 15:38:36,092 - INFO - Dosya tipi de\u011fi\u015fti: document
+2025-04-24 15:38:36,532 - INFO - Dosya tipi de\u011fi\u015fti: image
+2025-04-24 15:38:36,940 - INFO - Dosya tipi de\u011fi\u015fti: all
+2025-04-24 15:38:39,083 - INFO - Dosya tipi de\u011fi\u015fti: all
+2025-04-24 15:38:41,532 - INFO - Dosya tipi de\u011fi\u015fti: cad
+2025-04-24 15:38:47,419 - INFO - Dosya tipi de\u011fi\u015fti: cad
+2025-04-24 15:38:58,428 - INFO - Dosya tipi de\u011fi\u015fti: cad
+2025-04-24 15:38:58,603 - INFO - Dosya tipi de\u011fi\u015fti: cad
+2025-04-24 15:39:00,083 - INFO - Dosya tipi de\u011fi\u015fti: cad
+2025-04-24 15:39:11,018 - ERROR - Tkinter callback hatas\u0131: can't iconify ".": override-redirect flag is set

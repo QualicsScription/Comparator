@@ -21,7 +21,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import customtkinter as ctk
 
 # Yeni SolidWorks Analyzer'ı içe aktar
-from SolidWorksAnalyzerV3 import SolidWorksAnalyzer
+from SolidWorksAnalyzerV4 import SolidWorksAnalyzer
 
 # Uygulama sürümü
 __version__ = "2.0.0"
@@ -1229,6 +1229,26 @@ class GeneralComparator:
             logging.error(f"Genel karşılaştırma hatası: {e}")
             return {'score': 0, 'match': False, 'type': 'general'}
 
+def is_solidworks_file(file_path):
+    """Dosyanın SolidWorks dosyası olup olmadığını kontrol et"""
+    ext = os.path.splitext(file_path)[1].lower()
+    return ext in ['.sldprt', '.sldasm', '.slddrw']
+
+def get_file_type(file_path):
+    """Dosya tipini belirle"""
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in ['.sldprt', '.sldasm', '.slddrw']:
+        return 'solidworks'
+    elif ext in ['.step', '.stp', '.iges', '.igs', '.stl', '.obj', '.dxf']:
+        return 'cad'
+    elif ext in ['.docx', '.xlsx', '.pdf', '.txt']:
+        return 'document'
+    elif ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']:
+        return 'image'
+    else:
+        return 'unknown'
+
+
 class FileComparator:
     """Dosya karşılaştırma işlemlerini yöneten sınıf."""
 
@@ -1317,17 +1337,20 @@ class FileComparator:
                 return {'score': 100.0, 'match': True}
 
             # Detayları al
-            metadata_sim = sw_result.get('details', {}).get('metadata', 0)
-            content_sim = sw_result.get('details', {}).get('content', 0)
-            structure_sim = sw_result.get('details', {}).get('structure', 0)
+            details = sw_result.get('details', {})
+            feature_tree_sim = details.get('feature_tree', 0)
+            sketches_sim = details.get('sketches', 0)
+            geometry_sim = details.get('geometry', 0)
+            metadata_sim = details.get('metadata', 0)
 
             return {
                 'score': sw_result.get('score', 0),
                 'match': sw_result.get('match', False),
                 'details': {
                     'metadata': metadata_sim,
-                    'content': content_sim,
-                    'structure': structure_sim
+                    'feature_tree': feature_tree_sim,
+                    'sketches': sketches_sim,
+                    'geometry': geometry_sim
                 },
                 'similarity_category': sw_result.get('similarity_category', 'Bilinmiyor'),
                 'evaluation': sw_result.get('evaluation', '')
@@ -1546,8 +1569,9 @@ class FileComparator:
                     'score': sw_result.get('score', 0),
                     'match': sw_result.get('match', False),
                     'metadata': details.get('metadata', 0),
-                    'content': details.get('content', 0),
-                    'structure': details.get('structure', 0),
+                    'feature_tree': details.get('feature_tree', 0),
+                    'sketches': details.get('sketches', 0),
+                    'geometry': details.get('geometry', 0),
                     'type': 'solidworks',
                     'similarity_category': sw_result.get('similarity_category', 'Bilinmiyor'),
                     'evaluation': sw_result.get('evaluation', '')
@@ -1560,8 +1584,8 @@ class FileComparator:
             manipulation = self.detect_manipulation(file1, file2, {
                 'metadata': {'score': result.get('metadata', 0)},
                 'hash': {'score': 100 if result.get('match', False) else 0},
-                'semantic': {'score': result.get('content', 0) if file_type == 'solidworks' else result.get('content_similarity', 0)},
-                'structure': {'score': result.get('structure', 0)}
+                'semantic': {'score': result.get('geometry', 0) if file_type == 'solidworks' else result.get('content_similarity', 0)},
+                'structure': {'score': result.get('feature_tree', 0) if file_type == 'solidworks' else 0}
             })
 
             # Sonuç kategorizasyonu
@@ -1583,12 +1607,13 @@ class FileComparator:
                 comparison_result.update({
                     'metadata': result.get('metadata', 0),
                     'hash': 100 if result.get('match', False) else 0,
-                    'content': result.get('content', 0),
-                    'structure': result.get('structure', 0),
+                    'content': result.get('geometry', 0),
+                    'structure': result.get('feature_tree', 0),
                     'details': {
                         'metadata': result.get('metadata', 0),
-                        'content': result.get('content', 0),
-                        'structure': result.get('structure', 0)
+                        'feature_tree': result.get('feature_tree', 0),
+                        'sketches': result.get('sketches', 0),
+                        'geometry': result.get('geometry', 0)
                     }
                 })
             else:
@@ -1617,11 +1642,52 @@ class FileComparator:
                 'error': str(e)
             }
 
+class FileTypeSelector(ctk.CTkFrame):
+    def __init__(self, parent, command=None):
+        super().__init__(parent)
+        self.command = command
+        self.selected_type = ctk.StringVar(value="cad")  # Varsayılan CAD
+        self.setup_buttons()
+
+    def setup_buttons(self):
+        types = {
+            'cad': 'CAD/SolidWorks',
+            'document': 'Döküman',
+            'image': 'Görsel',
+            'all': 'Tüm Dosyalar'
+        }
+
+        for i, (value, text) in enumerate(types.items()):
+            btn = ctk.CTkRadioButton(
+                self,
+                text=text,
+                value=value,
+                variable=self.selected_type,
+                command=self._on_select,
+                corner_radius=0,
+                border_width_checked=0,
+                border_width_unchecked=0,
+                fg_color="#1a237e",
+                hover_color="#283593"
+            )
+            btn.grid(row=0, column=i, padx=5, pady=5, sticky="w")
+
+    def _on_select(self):
+        if self.command:
+            self.command(self.selected_type.get())
+
+    def get_selected(self):
+        return self.selected_type.get()
+
+
 class ModernFileComparator(ctk.CTk):
     """Modern arayüzlü dosya karşılaştırma uygulaması."""
 
     def __init__(self):
         super().__init__()
+
+        # Windows başlık çubuğunu gizle
+        self.overrideredirect(True)
 
         # Pencere ayarları
         self.title(f"Gelişmiş Dosya Karşılaştırıcı v{__version__}")
@@ -1629,8 +1695,7 @@ class ModernFileComparator(ctk.CTk):
         self.minsize(1200, 700)
 
         # Tema ayarları
-        ctk.set_appearance_mode("Light")
-        ctk.set_default_color_theme("blue")
+        self.setup_theme()
 
         # Pencere kapatma protokolünü ayarla
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -1687,12 +1752,18 @@ class ModernFileComparator(ctk.CTk):
         self.title_bar.bind("<B1-Motion>", self.on_move)
 
     def minimize_window(self):
-        """Windows'ta pencereyi simge durumuna küçült"""
-        # Windows'ta overrideredirect kullanıldığında iconify çalışmaz
-        # Bu nedenle geçici olarak overrideredirect'i kapatıp, pencereyi küçültüp, tekrar aç
-        self.withdraw()  # Pencereyi geçici olarak gizle
-        after_id = self.after(100, self.deiconify)  # 100ms sonra tekrar göster
+        """Pencereyi simge durumuna küçült"""
+        self.withdraw()
+        # Görev çubuğunda göster
+        self.wm_state('iconic')
+        # 100ms sonra tekrar göster
+        after_id = self.after(100, self.show_window)
         self.after_ids.append(after_id)
+
+    def show_window(self):
+        """Pencereyi göster"""
+        self.deiconify()
+        self.state('normal')
 
     def toggle_maximize(self):
         """Pencereyi büyüt/küçült."""
@@ -1729,6 +1800,35 @@ class ModernFileComparator(ctk.CTk):
             # Hata durumunda sessizce devam et
             pass
 
+    def setup_theme(self):
+        """Tema ayarları"""
+        # Dark tema
+        ctk.set_appearance_mode("dark")
+
+        # Tema uygula
+        ctk.set_default_color_theme("blue")  # Özel tema yerine şimdilik blue kullanıyoruz
+
+    def create_button(self, parent, text, command):
+        """Özel buton oluştur"""
+        btn = ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            corner_radius=0,
+            border_width=0,
+            fg_color="#1a237e",
+            hover_color="#283593",
+            text_color="white"
+        )
+
+        # Tıklama efekti
+        def on_click(event):
+            btn.configure(fg_color="#3949ab")
+            self.after(200, lambda: btn.configure(fg_color="#1a237e"))
+
+        btn.bind("<Button-1>", on_click)
+        return btn
+
     def setup_ui(self):
         """Kullanıcı arayüzünü oluşturur."""
         # Ana çerçeve
@@ -1746,18 +1846,8 @@ class ModernFileComparator(ctk.CTk):
         ctk.CTkButton(control_frame, text="📁 Gözat", command=self.browse_folder, width=100).grid(row=0, column=2, padx=5)
 
         # Dosya tipi seçimi
-        file_types = {
-            'solidworks': 'SolidWorks',
-            'cad': 'CAD',
-            'document': 'Döküman',
-            'image': 'Görsel',
-            'all': 'Tüm Dosyalar'
-        }
-
-        for i, (value, text) in enumerate(file_types.items()):
-            ctk.CTkRadioButton(control_frame, text=text, value=value,
-                              variable=ctk.StringVar(value="solidworks")).grid(
-                row=1, column=i, padx=5, pady=5, sticky="w")
+        self.file_type_selector = FileTypeSelector(control_frame, command=self.on_file_type_change)
+        self.file_type_selector.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky="w")
 
         # Minimum benzerlik
         filter_frame = ctk.CTkFrame(control_frame)
@@ -1885,6 +1975,11 @@ class ModernFileComparator(ctk.CTk):
             self.folder_path.delete(0, "end")
             self.folder_path.insert(0, folder)
 
+    def on_file_type_change(self, file_type):
+        """Dosya tipi değiştiğinde çağrılır"""
+        logging.info(f"Dosya tipi değişti: {file_type}")
+        # Burada dosya tipine göre ek işlemler yapılabilir
+
     def start_comparison(self):
         """Karşılaştırma işlemini başlatır."""
         if self.is_running:
@@ -1910,7 +2005,7 @@ class ModernFileComparator(ctk.CTk):
             after_id = self.after(0, lambda: self.status_var.set("Dosyalar taraniyor ve hazırlanıyor..."))
             self.after_ids.append(after_id)
 
-            file_type = "solidworks"  # Varsayılan olarak SolidWorks
+            file_type = self.file_type_selector.get_selected()  # Seçilen dosya tipi
             min_similarity = int(self.min_similarity.get())
             extensions = self.comparator.supported_extensions[file_type]
 
@@ -2144,16 +2239,34 @@ Minimum: {min(float(r['Toplam']) for r in self.results):.2f}%
                 self.update_comparison_details(res)
                 break
 
+    def generate_file_info(self, file_path):
+        """Dosya özelliklerini çıkar"""
+        try:
+            stat = os.stat(file_path)
+            return {
+                'name': os.path.basename(file_path),
+                'size': self.format_size(stat.st_size),
+                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                'type': 'SolidWorks' if is_solidworks_file(file_path) else get_file_type(file_path).capitalize(),
+                'path': file_path
+            }
+        except Exception as e:
+            logging.error(f"Dosya bilgisi alma hatası: {e}")
+            return None
+
     def update_file_info(self, file_data):
         """Dosya bilgilerini günceller."""
         def get_info(path):
             try:
-                stat = os.stat(path)
-                return (
-                    f"📄 {os.path.basename(path)}\n"
-                    f"📏 Boyut: {self.format_size(stat.st_size)}\n"
-                    f"🕒 Değiştirilme: {datetime.fromtimestamp(stat.st_mtime)}\n"
-                )
+                file_info = self.generate_file_info(path)
+                if file_info:
+                    return (
+                        f"📄 {file_info['name']}\n"
+                        f"📏 Boyut: {file_info['size']}\n"
+                        f"🕒 Değiştirilme: {file_info['modified']}\n"
+                        f"📁 Tür: {file_info['type']}\n"
+                    )
+                return f"Dosya bilgisi alınamadı: {path}"
             except Exception as e:
                 return f"Hata: {str(e)}"
 
@@ -2293,6 +2406,18 @@ Değerlendirme:
         """Karşılaştırma işlemini durdurur."""
         self.is_running = False
         self.status_var.set("İşlem durduruldu!")
+
+    def add_file_info_to_report(self, report, file1, file2):
+        """Rapora dosya bilgilerini ekle"""
+        info1 = self.generate_file_info(file1)
+        info2 = self.generate_file_info(file2)
+
+        if info1 and info2:
+            report['file_info'] = {
+                'file1': info1,
+                'file2': info2
+            }
+        return report
 
     def generate_report(self):
         """HTML rapor oluşturur."""
