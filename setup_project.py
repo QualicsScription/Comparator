@@ -54,3 +54,39 @@ if __name__ == "__main__":
     logging.info("Klasör yapısı oluşturuluyor...")
     create_directory_structure()
     logging.info("Klasör yapısı oluşturuldu!")
+
+
+import os
+
+def create_gitkeep():
+    directories = [
+        "main/src/ui",
+        "main/src/core",
+        "main/src/utils",
+        "main/src/config",
+        "main/resources/images",
+        "main/resources/icons",
+        "main/resources/themes",
+        "main/docs",
+        "dev/tests/unit",
+        "dev/tests/integration",
+        "dev/tests/test_data",
+        "dev/tools/benchmarks",
+        "dev/tools/scripts",
+        "dev/docs/api",
+        "dev/docs/architecture",
+        "dev/reports/performance",
+        "dev/reports/analysis",
+        "old/v1",
+        "old/v2",
+        "old/archive"
+    ]
+    
+    for directory in directories:
+        gitkeep_path = os.path.join(directory, '.gitkeep')
+        with open(gitkeep_path, 'w') as f:
+            pass
+        print(f"Created .gitkeep in {directory}")
+
+if __name__ == "__main__":
+    create_gitkeep()
