@@ -1,0 +1,226 @@
+=== DEVELOPER ANALYSIS REPORT ===
+
+PERFORMANCE METRICS
+-----------------
+Total Runtime: 4206.85 seconds
+Total Comparisons: 21
+Memory Usage: N/A (psutil not available)
+
+COMPARISON ANALYSIS
+------------------
+High Similarity (>90%): 1
+Average Similarity: 16.89%
+
+ALGORITHM ANALYSIS
+-----------------
+Feature Tree Analysis:
+- Success Rate: 0.00%
+- Average Time: 0.00 ms
+- Error Rate: 100.00%
+
+Geometry Analysis:
+- Success Rate: 0.00%
+- Average Time: 0.00 ms
+- Error Rate: 100.00%
+
+ERROR ANALYSIS
+-------------
+No errors detected.
+
+IMPROVEMENT SUGGESTIONS
+----------------------
+- Improve feature tree comparison algorithm accuracy
+- Enhance geometry comparison precision
+- Refine feature tree comparison algorithm for 1 inconsistent cases
+
+DETAILED COMPARISON ANALYSIS
+--------------------------
+
+Comparing: File1.SLDPRT vs File1_Copy.SLDPRT
+Total Score: 100.0%
+Component Scores:
+- Metadata: 100.0%
+- Hash: 100.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1.SLDPRT vs File1_MajorChange.SLDPRT
+Total Score: 13.8%
+Component Scores:
+- Metadata: 53.6%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1.SLDPRT vs File1_MinorChange.SLDPRT
+Total Score: 14.4%
+Component Scores:
+- Metadata: 52.8%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1.SLDPRT vs File1_SaveAs.SLDPRT
+Total Score: 13.7%
+Component Scores:
+- Metadata: 53.5%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1.SLDPRT vs File2.SLDPRT
+Total Score: 29.1%
+Component Scores:
+- Metadata: 98.0%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1.SLDPRT vs File3.SLDPRT
+Total Score: 0.0%
+Component Scores:
+- Metadata: 0.0%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_Copy.SLDPRT vs File1_MajorChange.SLDPRT
+Total Score: 13.8%
+Component Scores:
+- Metadata: 53.6%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_Copy.SLDPRT vs File1_MinorChange.SLDPRT
+Total Score: 14.4%
+Component Scores:
+- Metadata: 52.8%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_Copy.SLDPRT vs File1_SaveAs.SLDPRT
+Total Score: 13.7%
+Component Scores:
+- Metadata: 53.5%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_Copy.SLDPRT vs File2.SLDPRT
+Total Score: 29.1%
+Component Scores:
+- Metadata: 98.0%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_Copy.SLDPRT vs File3.SLDPRT
+Total Score: 0.0%
+Component Scores:
+- Metadata: 0.0%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_MajorChange.SLDPRT vs File1_MinorChange.SLDPRT
+Total Score: 23.7%
+Component Scores:
+- Metadata: 98.8%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_MajorChange.SLDPRT vs File1_SaveAs.SLDPRT
+Total Score: 23.5%
+Component Scores:
+- Metadata: 99.8%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_MajorChange.SLDPRT vs File2.SLDPRT
+Total Score: 14.3%
+Component Scores:
+- Metadata: 52.3%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_MajorChange.SLDPRT vs File3.SLDPRT
+Total Score: 0.0%
+Component Scores:
+- Metadata: 0.0%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_MinorChange.SLDPRT vs File1_SaveAs.SLDPRT
+Total Score: 23.8%
+Component Scores:
+- Metadata: 98.9%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_MinorChange.SLDPRT vs File2.SLDPRT
+Total Score: 13.6%
+Component Scores:
+- Metadata: 51.5%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_MinorChange.SLDPRT vs File3.SLDPRT
+Total Score: 0.0%
+Component Scores:
+- Metadata: 0.0%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_SaveAs.SLDPRT vs File2.SLDPRT
+Total Score: 13.8%
+Component Scores:
+- Metadata: 52.2%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File1_SaveAs.SLDPRT vs File3.SLDPRT
+Total Score: 0.0%
+Component Scores:
+- Metadata: 0.0%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+
+
+Comparing: File2.SLDPRT vs File3.SLDPRT
+Total Score: 0.0%
+Component Scores:
+- Metadata: 0.0%
+- Hash: 0.0%
+- Content: 0.0%
+- Structure: 0.0%
+

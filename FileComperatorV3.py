@@ -20,11 +20,211 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import customtkinter as ctk
 
+# Logging ayarları
+def setup_logging():
+    """Konsol ve dosya logging ayarlarını yapılandırır"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            # Konsol çıktısı
+            logging.StreamHandler(sys.stdout),
+            # Dosya çıktısı
+            logging.FileHandler('app.log', encoding='utf-8')
+        ]
+    )
+
+# Ana uygulama başlamadan önce logging'i ayarla
+setup_logging()
+
 # Yeni SolidWorks Analyzer'ı içe aktar
 from SolidWorksAnalyzerV4 import SolidWorksAnalyzer
+# SolidWorks API entegrasyonu ve gelişmiş karşılaştırıcı
+try:
+    from SolidWorksInterface import SolidWorksInterface
+    from EnhancedComparator import EnhancedComparator
+    SOLIDWORKS_API_AVAILABLE = True
+except ImportError:
+    SOLIDWORKS_API_AVAILABLE = False
 
 # Uygulama sürümü
 __version__ = "2.0.0"
+
+class MaterialColors:
+    """Material Design renk paleti"""
+    PRIMARY = "#2196F3"  # Blue 500
+    PRIMARY_LIGHT = "#64B5F6"  # Blue 300
+    PRIMARY_DARK = "#1976D2"  # Blue 700
+
+    SECONDARY = "#FF4081"  # Pink A200
+    SECONDARY_LIGHT = "#FF80AB"  # Pink A100
+    SECONDARY_DARK = "#F50057"  # Pink A400
+
+    BACKGROUND = "#121212"
+    SURFACE = "#1E1E1E"
+
+    ON_PRIMARY = "#FFFFFF"
+    ON_SECONDARY = "#FFFFFF"
+    ON_BACKGROUND = "#FFFFFF"
+    ON_SURFACE = "#FFFFFF"
+
+    SUCCESS = "#4CAF50"
+    ERROR = "#F44336"
+    WARNING = "#FFC107"
+    INFO = "#2196F3"
+
+    BUTTON_NORMAL = PRIMARY
+    BUTTON_HOVER = PRIMARY_LIGHT
+    BUTTON_PRESSED = PRIMARY_DARK
+    BUTTON_DISABLED = "#424242"
+
+class ModernTheme:
+    """Modern tema ayarları"""
+    def __init__(self):
+        self.colors = MaterialColors
+        self.configure_styles()
+
+    def configure_styles(self):
+        """Tüm widget stillerini yapılandır"""
+        # TTK stilleri
+        style = ttk.Style()
+        style.theme_use('clam')  # En uyumlu tema
+
+        # Treeview (tablo) stili
+        style.configure(
+            "Treeview",
+            background=self.colors.SURFACE,
+            foreground=self.colors.ON_SURFACE,
+            fieldbackground=self.colors.SURFACE,
+            borderwidth=0,
+            font=('Segoe UI', 10)
+        )
+
+        style.configure(
+            "Treeview.Heading",
+            background=self.colors.PRIMARY_DARK,
+            foreground=self.colors.ON_PRIMARY,
+            borderwidth=0,
+            font=('Segoe UI', 10, 'bold')
+        )
+
+        # Scrollbar stili
+        style.configure(
+            "Custom.Vertical.TScrollbar",
+            background=self.colors.PRIMARY,
+            troughcolor=self.colors.SURFACE,
+            borderwidth=0,
+            arrowcolor=self.colors.ON_PRIMARY
+        )
+
+        style.configure(
+            "Custom.Horizontal.TScrollbar",
+            background=self.colors.PRIMARY,
+            troughcolor=self.colors.SURFACE,
+            borderwidth=0,
+            arrowcolor=self.colors.ON_PRIMARY
+        )
+
+        # CustomTkinter genel ayarları
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")  # Özel tema yerine şimdilik blue kullanıyoruz
+
+class ModernButton(ctk.CTkButton):
+    """Özel buton sınıfı"""
+    def __init__(self, master, text, command=None, **kwargs):
+        super().__init__(
+            master=master,
+            text=text,
+            command=command,
+            corner_radius=0,
+            border_width=0,
+            fg_color=MaterialColors.BUTTON_NORMAL,
+            hover_color=MaterialColors.BUTTON_HOVER,
+            text_color=MaterialColors.ON_PRIMARY,
+            **kwargs
+        )
+        self.is_active = False
+
+    def set_active(self, active):
+        """Buton aktif durumunu ayarla"""
+        self.is_active = active
+        if active:
+            self.configure(fg_color=MaterialColors.BUTTON_PRESSED)
+        else:
+            self.configure(fg_color=MaterialColors.BUTTON_NORMAL)
+
+
+class CustomScrollableFrame(ctk.CTkFrame):
+    """Özel kaydırılabilir çerçeve"""
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+
+        # Canvas oluştur
+        self.canvas = tk.Canvas(
+            self,
+            bg=MaterialColors.SURFACE,
+            highlightthickness=0,
+            borderwidth=0
+        )
+
+        # Özel scrollbar
+        self.scrollbar = ctk.CTkScrollbar(
+            self,
+            orientation="vertical",
+            command=self.canvas.yview,
+            button_color=MaterialColors.PRIMARY,
+            button_hover_color=MaterialColors.PRIMARY_LIGHT,
+            width=8
+        )
+
+        # İçerik frame'i
+        self.content_frame = ctk.CTkFrame(
+            self.canvas,
+            fg_color=MaterialColors.SURFACE
+        )
+
+        # Canvas'a frame'i yerleştir
+        self.canvas_frame = self.canvas.create_window(
+            (0, 0),
+            window=self.content_frame,
+            anchor="nw"
+        )
+
+        # Scroll yapılandırması
+        self.content_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+
+        self.canvas.bind(
+            "<Configure>",
+            self._on_canvas_configure
+        )
+
+        # Yerleşim
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        # Scrollbar'ı sadece gerektiğinde göster
+        self.content_frame.bind(
+            "<Configure>",
+            self._check_scrollbar
+        )
+
+    def _on_canvas_configure(self, event):
+        # Canvas genişliğini içerik frame'ine uygula
+        self.canvas.itemconfig(
+            self.canvas_frame,
+            width=event.width
+        )
+
+    def _check_scrollbar(self, event):
+        # İçerik yüksekliği canvas'tan büyükse scrollbar'ı göster
+        if self.content_frame.winfo_reqheight() > self.canvas.winfo_height():
+            self.scrollbar.pack(side="right", fill="y")
+        else:
+            self.scrollbar.pack_forget()
 
 # Loglama ayarları
 logging.basicConfig(
@@ -1329,7 +1529,33 @@ class FileComparator:
     def _compare_solidworks_files(self, file1, file2):
         """SolidWorks dosyalarını karşılaştırır."""
         try:
-            # Yeni SolidWorksAnalyzer sınıfını kullan
+            # Gelişmiş karşılaştırıcı kullanılabilir mi?
+            if SOLIDWORKS_API_AVAILABLE:
+                try:
+                    # Gelişmiş karşılaştırıcıyı kullan
+                    enhanced_comparator = EnhancedComparator()
+                    enhanced_result = enhanced_comparator.compare_files(file1, file2)
+
+                    if enhanced_result:
+                        # Gelişmiş sonuçları dönüştür
+                        return {
+                            'score': enhanced_result['weighted_result'],
+                            'match': enhanced_result['weighted_result'] > 95,
+                            'details': {
+                                'metadata': enhanced_result['comparison']['dosya_bilgileri']['similarity'],
+                                'feature_tree': enhanced_result['comparison']['model_yapısı']['feature_tree_similarity'],
+                                'sketches': enhanced_result['comparison']['model_yapısı']['sketch_similarity'],
+                                'geometry': enhanced_result['comparison']['geometri']['similarity']
+                            },
+                            'enhanced': True,
+                            'analysis': enhanced_result['analysis'],
+                            'metric_descriptions': enhanced_result['metric_descriptions']
+                        }
+                except Exception as e:
+                    logging.error(f"Gelişmiş karşılaştırma hatası: {e}")
+                    # Hata durumunda standart karşılaştırıcıya geri dön
+
+            # Standart SolidWorksAnalyzer sınıfını kullan
             sw_result = self.solidworks_comparator.compare(file1, file2)
 
             # Sonuç doğrudan kullanılabilir
@@ -1649,146 +1875,242 @@ class ModernFileComparator(ctk.CTk):
     """Modern arayüzlü dosya karşılaştırma uygulaması."""
 
     def __init__(self):
-        super().__init__()
-
-        # Pencere ayarları
-        self.title(f"Gelişmiş Dosya Karşılaştırıcı v{__version__}")
-        self.geometry("1400x800")
-        self.minsize(1200, 700)
-
-        # Windows görev çubuğunda göstermek için
         try:
-            # İkon dosyası varsa ayarla
-            self.iconbitmap("icon.ico")
-        except:
-            pass
+            super().__init__()
 
-        # Windows başlık çubuğunu gizle
-        self.overrideredirect(True)
+            # Temel değişkenler
+            self.is_running = False
+            self.results = []
+            self.after_ids = []
 
-        # Tema ayarları
-        self.setup_theme()
+            # Pencere ayarları
+            self.title(f"Gelişmiş Dosya Karşılaştırıcı v{__version__}")
+            self.geometry("1400x800")
+            self.configure(fg_color=MaterialColors.BACKGROUND)
 
-        # Pencere kapatma protokolünü ayarla
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
+            # Karşılaştırıcı nesnesi
+            self.comparator = FileComparator()
 
-        # After ID'lerini saklamak için liste
-        self.after_ids = []
+            # Metrik değişkenleri
+            self.start_time = time.time()
+            self.total_time = 0
+            self.feature_tree_success_rate = 0
+            self.feature_tree_avg_time = 0
+            self.geometry_success_rate = 0
+            self.geometry_avg_time = 0
 
-        # Özel başlık çubuğu
-        self.create_custom_title_bar()
+            # Rapor klasörlerini oluştur
+            self.setup_report_directories()
 
-        # Karşılaştırıcı nesnesi
-        self.comparator = FileComparator()
-        self.results = []
-        self.is_running = False
+            # Pencere durumu
+            self.is_maximized = False
+            self.old_size = None
+            self.old_position = None
 
-        # Kullanıcı arayüzü
-        self.setup_ui()
+            # Buton referanslarını sakla
+            self.start_btn = None
+            self.stop_btn = None
+
+            # UI bileşenleri
+            self.setup_ui()
+            self.center_window()
+
+            # Pencere kapatma protokolünü ayarla
+            self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+            logging.info("Uygulama başarıyla başlatıldı")
+
+        except Exception as e:
+            logging.error(f"Başlatma hatası: {e}")
+            messagebox.showerror("Kritik Hata", f"Uygulama başlatılamadı: {str(e)}")
+            self.quit()
+
+    def setup_report_directories(self):
+        """Rapor klasörlerini oluşturur"""
+        try:
+            # Ana rapor klasörü
+            if not os.path.exists("Reports"):
+                os.makedirs("Reports")
+
+            # Geliştirici rapor klasörü
+            if not os.path.exists("Reports/Developer"):
+                os.makedirs("Reports/Developer")
+
+            logging.info("Rapor klasörleri oluşturuldu")
+
+        except Exception as e:
+            logging.error(f"Rapor klasörleri oluşturma hatası: {e}")
+
+    def center_window(self):
+        """Pencereyi ekranın ortasına konumlandırır"""
+        try:
+            # Ekran boyutlarını al
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+
+            # Pencere boyutlarını al
+            window_width = 1400  # Varsayılan genişlik
+            window_height = 800  # Varsayılan yükseklik
+
+            # Merkez konumu hesapla
+            x = (screen_width - window_width) // 2
+            y = (screen_height - window_height) // 2
+
+            # Pencereyi konumlandır
+            self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+            logging.info("Pencere ekranın ortasına konumlandırıldı")
+
+        except Exception as e:
+            logging.error(f"Pencere konumlandırma hatası: {e}")
+            # Hata durumunda varsayılan konumu kullan
+            self.geometry("1400x800+100+100")
+
+    def on_error(self, error_msg, title="Hata"):
+        """Hata mesajlarını göster ve logla"""
+        logging.error(error_msg)
+        messagebox.showerror(title, error_msg)
 
         # Pencere boyutlandırma olayları
         self.bind("<Configure>", self.on_resize)
 
-    def create_custom_title_bar(self):
-        """Özel başlık çubuğu oluşturur."""
-        # Başlık çubuğu çerçevesi
-        self.title_bar = ctk.CTkFrame(self, height=30, corner_radius=0)
-        self.title_bar.pack(fill=tk.X)
-        self.title_bar.pack_propagate(False)
+    def create_title_bar(self):
+        """Özel başlık çubuğu oluştur"""
+        title_bar = ctk.CTkFrame(self, fg_color=self.theme.colors.PRIMARY_DARK, height=30)
+        title_bar.pack(fill=tk.X, side=tk.TOP)
 
-        # Başlık etiketi
-        title_label = ctk.CTkLabel(self.title_bar, text=f"Gelişmiş Dosya Karşılaştırıcı v{__version__}")
-        title_label.pack(side=tk.LEFT, padx=10)
+        # Başlık
+        title = ctk.CTkLabel(
+            title_bar,
+            text=f"Gelişmiş Dosya Karşılaştırıcı v{__version__}",
+            text_color=self.theme.colors.ON_PRIMARY
+        )
+        title.pack(side=tk.LEFT, padx=10)
 
         # Pencere kontrol butonları
-        button_frame = ctk.CTkFrame(self.title_bar, fg_color="transparent")
-        button_frame.pack(side=tk.RIGHT)
+        btn_frame = ctk.CTkFrame(title_bar, fg_color="transparent")
+        btn_frame.pack(side=tk.RIGHT, padx=5)
 
-        # Pencere kontrol butonları - Windows stili
-        minimize_btn = ctk.CTkButton(
-            button_frame,
+        # Minimize butonu
+        min_btn = ModernButton(
+            btn_frame,
             text="─",
-            width=30,
-            height=30,
-            fg_color="#1a237e",
-            hover_color="#283593",
+            width=40,
+            height=25,
             command=self.minimize_window
         )
-        minimize_btn.pack(side=tk.LEFT, padx=2)
+        min_btn.pack(side=tk.LEFT, padx=2)
 
-        maximize_btn = ctk.CTkButton(
-            button_frame,
+        # Maximize butonu
+        self.max_btn = ModernButton(
+            btn_frame,
             text="□",
-            width=30,
-            height=30,
-            fg_color="#1a237e",
-            hover_color="#283593",
+            width=40,
+            height=25,
             command=self.toggle_maximize
         )
-        maximize_btn.pack(side=tk.LEFT, padx=2)
+        self.max_btn.pack(side=tk.LEFT, padx=2)
 
-        close_btn = ctk.CTkButton(
-            button_frame,
-            text="✕",
-            width=30,
-            height=30,
-            fg_color="#e81123",  # Windows kırmızı
-            hover_color="#f1707a",
-            command=self.on_close
+        # Kapat butonu
+        close_btn = ModernButton(
+            btn_frame,
+            text="×",
+            width=40,
+            height=25,
+            command=self.on_close,
+            fg_color=self.theme.colors.ERROR,
+            hover_color=self.theme.colors.ERROR
         )
         close_btn.pack(side=tk.LEFT, padx=2)
 
-        # Başlık çubuğunda sürükleme
-        self.title_bar.bind("<ButtonPress-1>", self.start_move)
-        self.title_bar.bind("<ButtonRelease-1>", self.stop_move)
-        self.title_bar.bind("<B1-Motion>", self.on_move)
+        # Pencere sürükleme için event'lar
+        title_bar.bind("<Button-1>", self.start_move)
+        title_bar.bind("<B1-Motion>", self.do_move)
+        title.bind("<Button-1>", self.start_move)
+        title.bind("<B1-Motion>", self.do_move)
 
-        # Çift tıklama ile tam ekran
-        self.title_bar.bind("<Double-1>", lambda e: self.toggle_maximize())
-
-        # Windows görev çubuğunda göstermek için
-        try:
-            self.iconbitmap(default="icon.ico")  # Eğer icon.ico dosyası varsa
-        except:
-            pass  # İkon dosyası yoksa sessizce devam et
+        return title_bar
 
     def minimize_window(self):
         """Pencereyi simge durumuna küçült"""
-        # Windows'ta overrideredirect ile küçültme için
-        self.overrideredirect(False)  # Geçici olarak başlık çubuğunu göster
-        self.iconify()  # Simge durumuna küçült
+        try:
+            self.withdraw()
+            self.overrideredirect(False)
+            self.iconify()
 
-    def show_window(self):
-        """Pencereyi göster"""
-        self.deiconify()
-        self.overrideredirect(True)  # Başlık çubuğunu tekrar gizle
-        self.state('normal')
+            def on_deiconify(event):
+                try:
+                    self.overrideredirect(True)
+                    self.deiconify()
+                    self.bind("<Map>", lambda e: None)
+                except Exception as e:
+                    logging.error(f"Pencere geri yükleme hatası: {e}")
+
+            self.bind("<Map>", on_deiconify)
+            logging.info("Pencere simge durumuna küçültüldü")
+
+        except Exception as e:
+            logging.error(f"Küçültme hatası: {e}")
 
     def toggle_maximize(self):
-        """Pencereyi büyüt/küçült."""
-        if self.state() == 'zoomed':
-            self.state('normal')
-        else:
-            self.state('zoomed')
+        """Tam ekran modunu aç/kapat"""
+        try:
+            if self.is_maximized:
+                self.restore_window()
+                logging.info("Pencere normal boyuta getirildi")
+            else:
+                self.maximize_window()
+                logging.info("Pencere tam ekran yapıldı")
+
+        except Exception as e:
+            logging.error(f"Tam ekran geçiş hatası: {e}")
+
+    def maximize_window(self):
+        """Pencereyi tam ekran yap"""
+        try:
+            self.old_size = self.geometry()
+            self.old_position = (self.winfo_x(), self.winfo_y())
+
+            # Görev çubuğu hariç tam ekran
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight() - 40  # Görev çubuğu için boşluk
+            self.geometry(f"{screen_width}x{screen_height}+0+0")
+
+            self.is_maximized = True
+            self.max_btn.configure(text="❐")
+
+        except Exception as e:
+            logging.error(f"Tam ekran yapma hatası: {e}")
+
+    def restore_window(self):
+        """Pencereyi eski haline getir"""
+        try:
+            if self.old_size:
+                self.geometry(self.old_size)
+                if self.old_position:
+                    self.geometry(f"+{self.old_position[0]}+{self.old_position[1]}")
+
+            self.is_maximized = False
+            self.max_btn.configure(text="□")
+
+        except Exception as e:
+            logging.error(f"Pencere geri yükleme hatası: {e}")
+            # Hata durumunda varsayılan boyuta getir
+            self.geometry("1400x800")
+
+    # Eski toggle_maximize metodu kaldırıldı
 
     def start_move(self, event):
-        """Pencere taşımayı başlat."""
+        """Pencere sürüklemeyi başlat"""
         self.x = event.x
         self.y = event.y
 
-    def stop_move(self, event):
-        """Pencere taşımayı durdur."""
-        self.x = None
-        self.y = None
-
-    def on_move(self, event):
-        """Pencereyi taşı."""
-        if hasattr(self, 'x') and hasattr(self, 'y'):
-            deltax = event.x - self.x
-            deltay = event.y - self.y
-            x = self.winfo_x() + deltax
-            y = self.winfo_y() + deltay
-            self.geometry(f"+{x}+{y}")
+    def do_move(self, event):
+        """Pencereyi sürükle"""
+        deltax = event.x - self.x
+        deltay = event.y - self.y
+        x = self.winfo_x() + deltax
+        y = self.winfo_y() + deltay
+        self.geometry(f"+{x}+{y}")
 
     def on_resize(self, event):
         """Pencere boyutlandırıldığında çağrılır."""
@@ -1800,12 +2122,32 @@ class ModernFileComparator(ctk.CTk):
             pass
 
     def setup_theme(self):
-        """Tema ayarları"""
-        # Dark tema
+        """Tema ayarlarını yapılandırır."""
+        # Ana pencere ayarları
+        self.configure(fg_color=MaterialColors.BACKGROUND)
+
+        # CustomTkinter genel ayarları
         ctk.set_appearance_mode("dark")
 
-        # Tema uygula
-        ctk.set_default_color_theme("blue")  # Özel tema yerine şimdilik blue kullanıyoruz
+        # Tüm frame'ler için
+        for widget in self.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                widget.configure(
+                    fg_color=MaterialColors.SURFACE,
+                    border_width=0,
+                    corner_radius=0
+                )
+
+        # Tüm butonlar için
+        for widget in self.winfo_all_children():
+            if isinstance(widget, ctk.CTkButton):
+                widget.configure(
+                    fg_color=MaterialColors.BUTTON_NORMAL,
+                    hover_color=MaterialColors.BUTTON_HOVER,
+                    text_color=MaterialColors.ON_PRIMARY,
+                    corner_radius=0,
+                    border_width=0
+                )
 
         # Radio butonlar için dark tema
         self.setup_radio_buttons()
@@ -1830,67 +2172,57 @@ class ModernFileComparator(ctk.CTk):
             foreground=[('active', 'white'), ('selected', 'white')]
         )
 
-    def create_button(self, parent, text, command):
-        """Özel buton oluştur"""
-        btn = ctk.CTkButton(
-            parent,
-            text=text,
-            command=command,
-            corner_radius=0,
-            border_width=0,
-            fg_color="#1a237e",
-            hover_color="#283593",
-            text_color="white"
-        )
-
-        # Tıklama efekti
-        def on_click(event):
-            btn.configure(fg_color="#3949ab")
-            self.after(200, lambda: btn.configure(fg_color="#1a237e"))
-
-        btn.bind("<Button-1>", on_click)
-        return btn
+    def create_button(self, parent, text, command, **kwargs):
+        """Standart buton oluşturma metodu"""
+        return ModernButton(parent, text=text, command=command, **kwargs)
 
     def setup_ui(self):
         """Kullanıcı arayüzünü oluşturur."""
         # Ana çerçeve
-        main_frame = ctk.CTkFrame(self)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Kontrol paneli
-        control_frame = ctk.CTkFrame(main_frame)
-        control_frame.pack(fill=tk.X, pady=5)
+        # Üst panel - Klasör seçimi ve benzerlik ayarı
+        top_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        top_frame.pack(fill=tk.X, pady=(0, 10))
 
-        # Klasör seçimi
-        ctk.CTkLabel(control_frame, text="Klasör:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.folder_path = ctk.CTkEntry(control_frame, width=500)
-        self.folder_path.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(control_frame, text="📁 Gözat", command=self.browse_folder, width=100).grid(row=0, column=2, padx=5)
+        # Grid yapılandırması
+        top_frame.grid_columnconfigure(1, weight=1)  # Klasör yolu için esnek alan
 
-        # Dosya tipi seçimi kaldırıldı - otomatik tanıma kullanılıyor
+        # Klasör seçimi (sol)
+        folder_label = ctk.CTkLabel(top_frame, text="Klasör:")
+        folder_label.grid(row=0, column=0, padx=(10, 5))
 
-        # Minimum benzerlik - en sağda
-        filter_frame = ctk.CTkFrame(control_frame)
-        filter_frame.grid(row=0, column=4, padx=5, pady=5, sticky="e")
-        ctk.CTkLabel(filter_frame, text="Min. Benzerlik:").pack(side="left", padx=5)
+        self.folder_path = ctk.CTkEntry(top_frame)
+        self.folder_path.grid(row=0, column=1, sticky="ew", padx=5)
 
-        self.min_similarity = ctk.CTkEntry(filter_frame, width=50)
-        self.min_similarity.pack(side="left", padx=5)
-        self.min_similarity.insert(0, "0")
+        browse_btn = self.create_button(top_frame, "...", self.browse_folder)
+        browse_btn.grid(row=0, column=2, padx=5)
 
-        ctk.CTkLabel(filter_frame, text="%").pack(side="left", padx=5)
+        # Minimum benzerlik (sağ)
+        similarity_label = ctk.CTkLabel(top_frame, text="Min. Benzerlik:")
+        similarity_label.grid(row=0, column=3, padx=5)
+
+        self.min_similarity = ctk.CTkEntry(top_frame, width=60)
+        self.min_similarity.insert(0, "0")  # Varsayılan değer 0
+        self.min_similarity.grid(row=0, column=4, padx=(0, 10))
 
         # İlerleme çubuğu
-        self.progress = ctk.CTkProgressBar(main_frame, orientation="horizontal")
-        self.progress.pack(fill=tk.X, pady=5)
-        self.progress.set(0)
+        progress_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        progress_frame.pack(fill=tk.X, pady=5)
 
-        self.status_var = ctk.StringVar(value="Hazır")
-        ctk.CTkLabel(main_frame, textvariable=self.status_var).pack(pady=5)
+        self.status_var = tk.StringVar(value="Hazır")
+        status_label = ctk.CTkLabel(progress_frame, textvariable=self.status_var)
+        status_label.pack(side=tk.LEFT, padx=5)
+
+        self.progress = ctk.CTkProgressBar(progress_frame)
+        self.progress.pack(side=tk.RIGHT, padx=5, fill=tk.X, expand=True)
+        self.progress.set(0)
 
         # Sonuçlar paneli - dark tema için sekme yazılarını görünür yapma
         self.notebook = ctk.CTkTabview(
             main_frame,
+            fg_color="#1a237e",     # Ana arkaplan rengi
             segmented_button_fg_color="#1a237e",     # Sekme arkaplan rengi
             segmented_button_selected_color="#3949ab", # Seçili sekme rengi
             segmented_button_unselected_color="#1a237e", # Seçili olmayan sekme rengi
@@ -1917,99 +2249,148 @@ class ModernFileComparator(ctk.CTk):
 
         # Buton çerçevesini esnek hale getir
         button_frame.columnconfigure(0, weight=1)  # Sol boşluk
-        button_frame.columnconfigure(6, weight=1)  # Sağ boşluk
+        button_frame.columnconfigure(7, weight=1)  # Sağ boşluk
 
         # Orta kısımdaki butonlar için ağırlık yok (weight=0)
-        for i in range(1, 6):
+        for i in range(1, 7):
             button_frame.columnconfigure(i, weight=0)
 
         # Başlat butonu
-        start_btn = self.create_button(button_frame, "▶️ Başlat", self.start_comparison)
-        start_btn.grid(row=0, column=1, padx=5)
+        self.start_btn = self.create_button(button_frame, "▶️ Başlat", self.start_comparison)
+        self.start_btn.grid(row=0, column=1, padx=5)
 
         # Durdur butonu
-        stop_btn = self.create_button(button_frame, "⏹ Durdur", self.stop_comparison)
-        stop_btn.grid(row=0, column=2, padx=5)
+        self.stop_btn = self.create_button(button_frame, "⏹ Durdur", self.stop_comparison)
+        self.stop_btn.grid(row=0, column=2, padx=5)
 
         # Temizle butonu
         clear_btn = self.create_button(button_frame, "🗑️ Temizle", self.clear_results)
         clear_btn.grid(row=0, column=3, padx=5)
 
+        # Sonuçları Göster butonu
+        show_results_btn = self.create_button(button_frame, "👁️ Sonuçları Göster", self.display_comparison_results)
+        show_results_btn.grid(row=0, column=4, padx=5)
+
         # Rapor butonu
         report_btn = self.create_button(button_frame, "📊 Rapor", self.generate_report)
-        report_btn.grid(row=0, column=4, padx=5)
+        report_btn.grid(row=0, column=5, padx=5)
 
         # CSV butonu
         csv_btn = self.create_button(button_frame, "💾 CSV", self.export_results)
-        csv_btn.grid(row=0, column=5, padx=5)
+        csv_btn.grid(row=0, column=6, padx=5)
 
         # Yardım butonu - en sağda
         help_btn = self.create_button(button_frame, "?", self.show_help)
         help_btn.configure(width=30, height=30)
-        help_btn.grid(row=0, column=7, padx=5, sticky="e")
+        help_btn.grid(row=0, column=8, padx=5, sticky="e")
 
     def setup_table_view(self):
         """Sonuç tablosunu oluşturur."""
-        style = ttk.Style()
+        # Ana çerçeve
+        self.table_frame = ctk.CTkFrame(self.table_tab, fg_color=MaterialColors.SURFACE)
+        self.table_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Dark tema için tablo stilleri
+        # Tablo stili
+        style = ttk.Style()
+        style.theme_use('clam')
+
+        # Tablo ana stili
         style.configure(
-            "Treeview",
-            background="#2b2b2b",
-            foreground="white",
-            fieldbackground="#2b2b2b",
-            borderwidth=0
+            "Custom.Treeview",
+            background=MaterialColors.SURFACE,
+            foreground=MaterialColors.ON_SURFACE,
+            fieldbackground=MaterialColors.SURFACE,
+            borderwidth=0,
+            highlightthickness=0
+        )
+
+        # Tablo başlık stili
+        style.configure(
+            "Custom.Treeview.Heading",
+            background=MaterialColors.PRIMARY_DARK,
+            foreground=MaterialColors.ON_PRIMARY,
+            borderwidth=0,
+            relief="flat"
         )
 
         # Seçili satır stili
-        style.map('Treeview',
-            background=[('selected', '#1a237e')],
-            foreground=[('selected', 'white')]
+        style.map(
+            "Custom.Treeview",
+            background=[("selected", MaterialColors.PRIMARY)],
+            foreground=[("selected", MaterialColors.ON_PRIMARY)]
         )
 
-        # Header stili
-        style.configure(
-            "Treeview.Heading",
-            background="#1a237e",
-            foreground="white",
-            borderwidth=0
+        # Sütunları tanımla
+        self.columns = ('Dosya 1', 'Dosya 2', 'Metadata', 'Hash', 'İçerik', 'Yapı', 'Toplam', 'Sonuç')
+
+        # Tablo oluştur
+        self.tree = ttk.Treeview(
+            self.table_frame,
+            style="Custom.Treeview",
+            columns=self.columns,
+            show="headings",
+            selectmode="browse"
         )
 
-        columns = ('Dosya 1', 'Dosya 2', 'Metadata', 'Hash', 'İçerik', 'Yapı', 'Toplam', 'Sonuç')
-        self.tree = ttk.Treeview(self.table_tab, columns=columns, show='headings')
+        # Scrollbar'lar
+        vsb = ttk.Scrollbar(
+            self.table_frame,
+            orient="vertical",
+            command=self.tree.yview
+        )
+        hsb = ttk.Scrollbar(
+            self.table_frame,
+            orient="horizontal",
+            command=self.tree.xview
+        )
 
-        # Sütun başlıkları
-        for col in columns:
-            self.tree.heading(col, text=col, command=lambda c=col: self.sort_treeview(c))
-            self.tree.column(col, width=100 if col not in ['Dosya 1', 'Dosya 2', 'Sonuç'] else 150)
-
-        # Renk etiketleri - dark tema için daha koyu renkler
-        self.tree.tag_configure('high', background='#1a4731')   # Koyu yeşil
-        self.tree.tag_configure('medium', background='#2d4d1a') # Koyu yeşil-sarı
-        self.tree.tag_configure('low', background='#4d3319')    # Koyu turuncu
-        self.tree.tag_configure('none', background='#4d1a1a')   # Koyu kırmızı
-
-        # Kaydırma çubukları
-        vsb = ttk.Scrollbar(self.table_tab, orient="vertical", command=self.tree.yview)
-        hsb = ttk.Scrollbar(self.table_tab, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
 
-        # Yerleştirme
+        # Yerleşim
         self.tree.grid(row=0, column=0, sticky="nsew")
         vsb.grid(row=0, column=1, sticky="ns")
         hsb.grid(row=1, column=0, sticky="ew")
 
-        self.table_tab.grid_rowconfigure(0, weight=1)
-        self.table_tab.grid_columnconfigure(0, weight=1)
+        self.table_frame.grid_rowconfigure(0, weight=1)
+        self.table_frame.grid_columnconfigure(0, weight=1)
+
+        # Sütunları ayarla
+        for col in self.columns:
+            self.tree.heading(col, text=col, command=lambda c=col: self.sort_treeview(c))
+            self.tree.column(col, width=150 if col in ['Dosya 1', 'Dosya 2', 'Sonuç'] else 100)
+
+        # Renk etiketleri
+        self.tree.tag_configure('high', background=MaterialColors.SUCCESS)
+        self.tree.tag_configure('medium', background=MaterialColors.WARNING)
+        self.tree.tag_configure('low', background=MaterialColors.ERROR)
+        self.tree.tag_configure('none', background=MaterialColors.BUTTON_DISABLED)
 
         # Çift tıklama olayı
         self.tree.bind("<Double-1>", self.show_detail_view)
 
     def setup_visual_analysis(self):
         """Görsel analiz panelini oluşturur."""
-        # Ana çerçeve - esnek düzen için
-        visual_frame = ctk.CTkFrame(self.visual_tab)
-        visual_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Ana çerçeve - scroll desteği ile
+        canvas = ctk.CTkCanvas(self.visual_tab, bg="#2b2b2b", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.visual_tab, orient="vertical", command=canvas.yview)
+
+        visual_frame = ctk.CTkFrame(canvas)
+
+        # Scroll için configure
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Pack layout
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Frame'i canvas'a ekle
+        canvas.create_window((0, 0), window=visual_frame, anchor="nw", tags="visual_frame")
+
+        # Scroll için event'lar
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        visual_frame.bind("<Configure>", on_configure)
 
         # Üst kısım için grafik
         graph_frame = ctk.CTkFrame(visual_frame)
@@ -2082,22 +2463,33 @@ class ModernFileComparator(ctk.CTk):
     # on_file_type_change metodu kaldırıldı - otomatik dosya tipi tespiti kullanılıyor
 
     def start_comparison(self):
-        """Karşılaştırma işlemini başlatır."""
-        if self.is_running:
-            return
+        """Karşılaştırma işlemini başlatır"""
+        try:
+            if self.is_running:
+                return
 
-        folder = self.folder_path.get()
-        if not os.path.isdir(folder):
-            messagebox.showerror("Hata", "Geçerli bir klasör seçin!")
-            return
+            # Başlat butonunu aktif yap
+            self.start_btn.set_active(True)
+            self.stop_btn.set_active(False)
 
-        self.is_running = True
-        self.clear_results()
-        self.status_var.set("Dosyalar taranıyor...")
-        self.progress.set(0)
+            folder = self.folder_path.get()
+            if not os.path.isdir(folder):
+                self.on_error("Geçerli bir klasör seçin!")
+                self.start_btn.set_active(False)
+                return
 
-        # Ayrı bir thread'de karşılaştırma başlat
-        threading.Thread(target=self.run_comparison, args=(folder,), daemon=True).start()
+            self.is_running = True
+            self.clear_results()
+            self.status_var.set("Dosyalar taranıyor...")
+            self.progress.set(0)
+
+            threading.Thread(target=self.run_comparison, args=(folder,), daemon=True).start()
+            logging.info(f"Karşılaştırma başlatıldı: {folder}")
+
+        except Exception as e:
+            self.on_error(f"Karşılaştırma başlatılamadı: {str(e)}")
+            self.is_running = False
+            self.start_btn.set_active(False)
 
     def detect_file_type(self, file_path):
         """Dosya tipini otomatik tespit et"""
@@ -2229,14 +2621,11 @@ class ModernFileComparator(ctk.CTk):
                         self.after_ids.append(after_id)
                         last_update = time.time()
 
-            # Sonuçları göster
-            after_id1 = self.after(0, self.show_results)
-            after_id2 = self.after(0, self.update_visual_analysis)
-            after_id3 = self.after(0, lambda: self.status_var.set(f"Tamamlandı! {len(self.results)} benzer dosya çifti bulundu."))
-            after_id4 = self.after(0, lambda: self.progress.set(1))
+            # Sonuçları göster - yeni display_comparison_results metodunu kullan
+            after_id = self.after(0, self.display_comparison_results)
 
-            # After ID'lerini kaydet
-            self.after_ids.extend([after_id1, after_id2, after_id3, after_id4])
+            # After ID'sini kaydet
+            self.after_ids.append(after_id)
 
         except Exception as e:
             after_id = self.after(0, lambda: messagebox.showerror("Hata", str(e)))
@@ -2326,6 +2715,27 @@ class ModernFileComparator(ctk.CTk):
             self.canvas.draw()
 
         self.update_statistics()
+
+    def display_comparison_results(self):
+        """Karşılaştırma sonuçlarını görüntüler ve tüm panelleri günceller."""
+        if not self.results:
+            messagebox.showinfo("Bilgi", "Görüntülenecek sonuç bulunmuyor!")
+            return
+
+        # Tablo görünümünü güncelle
+        self.show_results()
+
+        # Görsel analiz panelini güncelle
+        self.update_visual_analysis()
+
+        # Tablo görünümü sekmesine geç
+        self.notebook.set("Tablo Görünümü")
+
+        # Durum çubuğunu güncelle
+        self.status_var.set(f"Toplam {len(self.results)} benzer dosya çifti bulundu.")
+
+        # İlerleme çubuğunu tamamla
+        self.progress.set(1)
 
     def update_statistics(self):
         """İstatistikleri günceller."""
@@ -2524,9 +2934,16 @@ Değerlendirme:
         self.progress.set(0)
 
     def stop_comparison(self):
-        """Karşılaştırma işlemini durdurur."""
-        self.is_running = False
-        self.status_var.set("İşlem durduruldu!")
+        """Karşılaştırmayı durdur"""
+        try:
+            self.is_running = False
+            self.start_btn.set_active(False)
+            self.stop_btn.set_active(True)
+            self.status_var.set("İşlem durduruldu!")
+            self.after(1000, lambda: self.stop_btn.set_active(False))
+            logging.info("Karşılaştırma durduruldu")
+        except Exception as e:
+            logging.error(f"Durdurma hatası: {e}")
 
     def add_file_info_to_report(self, report, file1, file2):
         """Rapora dosya bilgilerini ekle"""
@@ -2689,36 +3106,483 @@ Değerlendirme:
             messagebox.showerror("Hata", f"Rapor oluşturma sırasında hata oluştu:\n{str(e)}")
 
     def export_results(self):
-        """Sonuçları CSV olarak dışa aktarır."""
+        """Sonuçları CSV olarak dışa aktarır"""
         if not self.results:
             messagebox.showinfo("Bilgi", "Dışa aktarmak için sonuç bulunmuyor!")
             return
 
         try:
-            file_path = filedialog.asksaveasfilename(
-                defaultextension=".csv",
-                filetypes=[("CSV Dosyası", "*.csv")],
-                title="CSV Dosyasını Kaydet"
-            )
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-            if not file_path:
-                return
+            # Klasör yapısını kontrol et/oluştur
+            if not os.path.exists("Reports"):
+                os.makedirs("Reports")
+            if not os.path.exists("Reports/Developer"):
+                os.makedirs("Reports/Developer")
 
-            with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            # CSV dosya yolları
+            csv_path = f"Reports/comparison_results_{timestamp}.csv"
+            dev_report_path = f"Reports/Developer/dev_report_{timestamp}.txt"
+
+            # CSV dosyasını oluştur
+            with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
                 import csv
-                fieldnames = ['Dosya 1', 'Dosya 2', 'Metadata', 'Hash', 'İçerik', 'Yapı', 'Toplam', 'Sonuç']
+                fieldnames = ['Dosya 1', 'Dosya 2', 'Metadata', 'Hash', 'İçerik',
+                             'Yapı', 'Toplam', 'Sonuç']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
                 writer.writeheader()
                 for result in self.results:
                     row = {k: result[k] for k in fieldnames}
                     writer.writerow(row)
 
-            messagebox.showinfo("Başarılı", f"Sonuçlar başarıyla dışa aktarıldı:\n{file_path}")
+            # Geliştirici raporu
+            self.generate_dev_report(dev_report_path)
+
+            messagebox.showinfo("Başarılı",
+                f"Dosyalar oluşturuldu:\nCSV: {csv_path}\nGeliştirici Raporu: {dev_report_path}")
+
+            # CSV dosyasını aç
+            if messagebox.askyesno("Dosya Aç", "CSV dosyasını açmak ister misiniz?"):
+                webbrowser.open('file://' + os.path.realpath(csv_path))
 
         except Exception as e:
             logging.error(f"CSV dışa aktarma hatası: {e}")
             messagebox.showerror("Hata", f"CSV dışa aktarma sırasında hata oluştu:\n{str(e)}")
+
+    def generate_report(self):
+        """HTML ve geliştirici raporlarını oluşturur"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # Klasör yapısını kontrol et/oluştur
+            if not os.path.exists("Reports"):
+                os.makedirs("Reports")
+            if not os.path.exists("Reports/Developer"):
+                os.makedirs("Reports/Developer")
+
+            # Kullanıcı raporu (HTML)
+            user_report_path = f"Reports/comparison_report_{timestamp}.html"
+            self.generate_html_report(user_report_path)
+
+            # Geliştirici raporu (TXT)
+            dev_report_path = f"Reports/Developer/dev_report_{timestamp}.txt"
+            self.generate_dev_report(dev_report_path)
+
+            # Sadece HTML raporunu tarayıcıda aç
+            webbrowser.open('file://' + os.path.realpath(user_report_path))
+
+            # Başarı mesajı
+            messagebox.showinfo("Başarılı",
+                f"Raporlar oluşturuldu:\n\n"
+                f"Kullanıcı Raporu:\n{user_report_path}\n\n"
+                f"Geliştirici Raporu:\n{dev_report_path}")
+
+            return user_report_path, dev_report_path
+
+        except Exception as e:
+            logging.error(f"Rapor oluşturma hatası: {e}")
+            messagebox.showerror("Hata", f"Rapor oluşturma sırasında hata oluştu:\n{str(e)}")
+            return None, None
+
+    def generate_reports(self):
+        """Kullanıcı ve geliştirici raporlarını oluşturur (eski metod)"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        try:
+            # Kullanıcı raporu
+            user_report_path = f"Reports/comparison_report_{timestamp}.html"
+            self.generate_html_report(user_report_path)
+
+            # Geliştirici raporu
+            dev_report_path = f"Reports/Developer/dev_report_{timestamp}.txt"
+            self.generate_dev_report(dev_report_path)
+
+            messagebox.showinfo("Rapor", f"Raporlar oluşturuldu:\n- Kullanıcı: {user_report_path}\n- Geliştirici: {dev_report_path}")
+            return user_report_path, dev_report_path
+
+        except Exception as e:
+            logging.error(f"Rapor oluşturma hatası: {e}")
+            messagebox.showerror("Hata", f"Rapor oluşturma hatası: {str(e)}")
+            return None, None
+
+    def generate_dev_report(self, filepath=None):
+        """Geliştirici için detaylı analiz raporu"""
+        if filepath is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filepath = f"Reports/Developer/dev_report_{timestamp}.txt"
+
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("=== DEVELOPER ANALYSIS REPORT ===\n\n")
+
+                # 1. Performans Metrikleri
+                f.write("PERFORMANCE METRICS\n")
+                f.write("-----------------\n")
+                start_time = getattr(self, 'start_time', time.time() - self.total_time)
+                f.write(f"Total Runtime: {time.time() - start_time:.2f} seconds\n")
+                f.write(f"Total Comparisons: {len(self.results)}\n")
+                f.write(f"Memory Usage: {self.get_memory_usage()}\n\n")
+
+                # 2. Karşılaştırma Analizi
+                f.write("COMPARISON ANALYSIS\n")
+                f.write("------------------\n")
+                if self.results:
+                    success_count = sum(1 for r in self.results if float(r['Toplam']) > 90)
+                    f.write(f"High Similarity (>90%): {success_count}\n")
+                    f.write(f"Average Similarity: {np.mean([float(r['Toplam']) for r in self.results]):.2f}%\n\n")
+                else:
+                    f.write("No comparison results available.\n\n")
+
+                # 3. Algoritma Analizi
+                f.write("ALGORITHM ANALYSIS\n")
+                f.write("-----------------\n")
+                f.write("Feature Tree Analysis:\n")
+                f.write(f"- Success Rate: {self.feature_tree_success_rate:.2f}%\n")
+                f.write(f"- Average Time: {self.feature_tree_avg_time:.2f} ms\n")
+                f.write(f"- Error Rate: {100 - self.feature_tree_success_rate:.2f}%\n\n")
+
+                f.write("Geometry Analysis:\n")
+                f.write(f"- Success Rate: {self.geometry_success_rate:.2f}%\n")
+                f.write(f"- Average Time: {self.geometry_avg_time:.2f} ms\n")
+                f.write(f"- Error Rate: {100 - self.geometry_success_rate:.2f}%\n\n")
+
+                # 4. Hata Analizi
+                f.write("ERROR ANALYSIS\n")
+                f.write("-------------\n")
+                error_count = 0
+                for result in self.results:
+                    if 'error_details' in result and result['error_details']:
+                        error_count += 1
+                        f.write(f"- File: {result['Dosya 1']} vs {result['Dosya 2']}\n")
+                        for error in result['error_details']:
+                            f.write(f"  Error: {error}\n")
+                        f.write("\n")
+
+                if error_count == 0:
+                    f.write("No errors detected.\n\n")
+
+                # 5. İyileştirme Önerileri
+                f.write("IMPROVEMENT SUGGESTIONS\n")
+                f.write("----------------------\n")
+                suggestions = self.analyze_improvements()
+                if suggestions:
+                    for suggestion in suggestions:
+                        f.write(f"- {suggestion}\n")
+                else:
+                    f.write("No improvement suggestions at this time.\n")
+
+                # 6. Karşılaştırma Detayları
+                f.write("\nDETAILED COMPARISON ANALYSIS\n")
+                f.write("--------------------------\n")
+                for result in self.results:
+                    f.write(f"\nComparing: {result['Dosya 1']} vs {result['Dosya 2']}\n")
+                    f.write(f"Total Score: {result['Toplam']}%\n")
+                    f.write("Component Scores:\n")
+                    f.write(f"- Metadata: {result['Metadata']}%\n")
+                    f.write(f"- Hash: {result['Hash']}%\n")
+                    f.write(f"- Content: {result['İçerik']}%\n")
+                    f.write(f"- Structure: {result['Yapı']}%\n")
+                    if 'details' in result:
+                        f.write("SolidWorks Details:\n")
+                        for key, value in result['details'].items():
+                            f.write(f"  {key}: {value}%\n")
+                    f.write("\n")
+
+            logging.info(f"Geliştirici raporu oluşturuldu: {filepath}")
+            return filepath
+
+        except Exception as e:
+            logging.error(f"Geliştirici raporu oluşturma hatası: {e}")
+            return None
+
+    def analyze_improvements(self):
+        """İyileştirme önerileri oluşturur"""
+        suggestions = []
+
+        # Performans önerileri
+        avg_time = self.total_time / max(len(self.results), 1)
+        if avg_time > 1.0:
+            suggestions.append("Consider implementing parallel processing for comparisons")
+
+        try:
+            memory_usage = float(self.get_memory_usage().split()[0])
+            if memory_usage > 500:  # 500MB'dan fazla bellek kullanımı
+                suggestions.append("Optimize memory usage in geometry comparison")
+        except:
+            pass
+
+        # Doğruluk önerileri
+        if self.feature_tree_success_rate < 90:
+            suggestions.append("Improve feature tree comparison algorithm accuracy")
+
+        if self.geometry_success_rate < 90:
+            suggestions.append("Enhance geometry comparison precision")
+
+        # Hata yönetimi önerileri
+        error_count = sum(1 for r in self.results if r.get('error_details', []))
+        if error_count > 0:
+            suggestions.append(f"Implement better error handling for {error_count} error cases")
+
+        # Algoritma önerileri
+        slow_comparisons = [r for r in self.results if r.get('processing_time', 0) > 1.0]
+        if slow_comparisons:
+            suggestions.append(f"Optimize {len(slow_comparisons)} slow comparisons (>1s)")
+
+        # Feature tree analizi başarısız durumlar
+        low_feature_tree = [r for r in self.results
+                           if r.get('details', {}).get('feature_tree', 0) < 50
+                           and float(r['Toplam']) > 50]
+        if low_feature_tree:
+            suggestions.append(f"Refine feature tree comparison algorithm for {len(low_feature_tree)} inconsistent cases")
+
+        return suggestions
+
+    def generate_html_report(self, filepath):
+        """HTML kullanıcı raporu oluşturur"""
+        try:
+            # HTML şablonunu kullan
+            html_content = f"""
+        <!DOCTYPE html>
+        <html lang="tr">
+        <head>
+            <meta charset="UTF-8">
+            <title>Dosya Karşılaştırma Raporu</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                h1, h2 {{ color: #2196F3; }}
+                .summary {{ background-color: #f5f5f5; padding: 15px; margin: 15px 0; }}
+                table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #2196F3; color: white; }}
+                tr:nth-child(even) {{ background-color: #f9f9f9; }}
+                .high {{ background-color: #E8F5E9; color: #2E7D32; }}
+                .medium {{ background-color: #FFF8E1; color: #F57F17; }}
+                .low {{ background-color: #FFEBEE; color: #C62828; }}
+            </style>
+        </head>
+        <body>
+            <h1>Gelişmiş Dosya Karşılaştırma Raporu</h1>
+            <p>Oluşturulma Tarihi: {datetime.now().strftime("%d.%m.%Y %H:%M:%S")}</p>
+
+            <div class="summary">
+                <h2>Rapor Özeti</h2>
+                <p>Klasör: {os.path.basename(self.folder_path.get())}</p>
+                <p>Toplam Karşılaştırma: {len(self.results)}</p>
+                <p>SolidWorks Dosyaları: {sum(1 for r in self.results if r.get('details', {}).get('file_type') == 'solidworks')}</p>
+            """
+
+            # Ortalama benzerlik hesapla
+            if self.results:
+                avg_similarity = np.mean([float(r['Toplam']) for r in self.results])
+                html_content += f"<p>Ortalama Benzerlik: {avg_similarity:.2f}%</p>"
+
+            # Benzerlik dağılımı
+            high_similarity = sum(1 for r in self.results if float(r['Toplam']) > 90)
+            medium_similarity = sum(1 for r in self.results if 50 <= float(r['Toplam']) <= 90)
+            low_similarity = sum(1 for r in self.results if float(r['Toplam']) < 50)
+
+            html_content += f"""
+                <p>Yüksek Benzerlik (>90%): {high_similarity}</p>
+                <p>Orta Benzerlik (50-90%): {medium_similarity}</p>
+                <p>Düşük Benzerlik (<50%): {low_similarity}</p>
+            </div>
+
+            <h2>Karşılaştırma Sonuçları</h2>
+            <table>
+                <tr>
+                    <th>Dosya 1</th>
+                    <th>Dosya 2</th>
+                    <th>Metadata</th>
+                    <th>Hash</th>
+                    <th>İçerik</th>
+                    <th>Yapı</th>
+                    <th>Toplam</th>
+                    <th>Sonuç</th>
+                </tr>
+            """
+
+            # Sonuçları tabloya ekle
+            for result in self.results:
+                similarity = float(result['Toplam'])
+                row_class = ""
+                if similarity > 90:
+                    row_class = "high"
+                elif similarity >= 50:
+                    row_class = "medium"
+                else:
+                    row_class = "low"
+
+                html_content += f"""
+                <tr class="{row_class}">
+                    <td>{os.path.basename(result['Dosya 1'])}</td>
+                    <td>{os.path.basename(result['Dosya 2'])}</td>
+                    <td>{result['Metadata']}%</td>
+                    <td>{result['Hash']}%</td>
+                    <td>{result['İçerik']}%</td>
+                    <td>{result['Yapı']}%</td>
+                    <td>{result['Toplam']}%</td>
+                    <td>{result['Sonuç']}</td>
+                </tr>
+                """
+
+            # SolidWorks detaylı analiz bölümü
+            sw_files = [r for r in self.results if r.get('details', {}).get('file_type') == 'solidworks']
+            if sw_files:
+                html_content += """
+                </table>
+
+                <h2>SolidWorks Detaylı Analiz</h2>
+                <p>SolidWorks dosyaları için detaylı analiz sonuçları:</p>
+                """
+
+                for result in sw_files:
+                    details = result.get('details', {})
+                    html_content += f"""
+                    <div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5;">
+                        <h3>{os.path.basename(result['Dosya 1'])} ↔ {os.path.basename(result['Dosya 2'])}</h3>
+                        <p><strong>Sonuç:</strong> {result['Sonuç']} ({result['Toplam']}%)</p>
+                        <ul>
+                            <li>Feature Tree: {details.get('feature_tree', 0):.1f}%</li>
+                            <li>Sketch Data: {details.get('sketch_data', 0):.1f}%</li>
+                            <li>Geometry: {details.get('geometry', 0):.1f}%</li>
+                        </ul>
+                        <p><strong>Değerlendirme:</strong></p>
+                        <div style="padding: 10px; border-left: 4px solid #2196F3;">
+                            {self.get_sw_evaluation(details)}
+                        </div>
+                    </div>
+                    """
+            else:
+                html_content += "</table>"
+
+            # HTML'i kapat
+            html_content += """
+                <div style="margin-top: 30px; text-align: center; color: #666;">
+                    <p>Bu rapor Gelişmiş Dosya Karşılaştırıcı tarafından oluşturulmuştur.</p>
+                </div>
+            </body>
+            </html>
+            """
+
+            # Dosyayı kaydet
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+
+            logging.info(f"HTML raporu oluşturuldu: {filepath}")
+            return filepath
+
+        except Exception as e:
+            logging.error(f"HTML rapor oluşturma hatası: {e}")
+            raise
+
+    def _analyze_and_suggest_improvements(self, f):
+        """Performans analizi yaparak iyileştirme önerileri sunar (eski metod)"""
+        # Performans analizi
+        slow_comparisons = [r for r in self.results if r.get('processing_time', 0) > 1.0]
+        error_cases = [r for r in self.results if r.get('error_details', [])]
+
+        # Feature tree analizi başarısız durumlar
+        low_feature_tree = [r for r in self.results
+                           if r.get('details', {}).get('feature_tree', 0) < 50
+                           and float(r['Toplam']) > 50]
+
+        # Öneriler
+        f.write("Based on current analysis:\n")
+
+        if slow_comparisons:
+            f.write("\n1. Performance Issues:\n")
+            f.write(f"- {len(slow_comparisons)} comparisons took > 1s\n")
+            f.write("Suggestion: Implement parallel processing for these cases\n")
+
+        if error_cases:
+            f.write("\n2. Error Handling:\n")
+            f.write(f"- {len(error_cases)} comparisons had errors\n")
+            f.write("Suggestion: Improve error handling and recovery\n")
+
+        if low_feature_tree:
+            f.write("\n3. Feature Tree Analysis:\n")
+            f.write(f"- {len(low_feature_tree)} cases show inconsistent results\n")
+            f.write("Suggestion: Refine feature tree comparison algorithm\n")
+
+    def get_sw_evaluation(self, details):
+        """SolidWorks dosyaları için değerlendirme metni oluşturur"""
+        try:
+            # Değerlendirme kriterleri
+            feature_tree = details.get('feature_tree', 0)
+            sketch_data = details.get('sketch_data', 0)
+            geometry = details.get('geometry', 0)
+
+            # Manipülasyon tespiti
+            manipulation = details.get('manipulation', {})
+            detected = manipulation.get('detected', False)
+            manip_type = manipulation.get('type', 'None')
+
+            # Değerlendirme metni
+            if detected:
+                if manip_type == 'SaveAs':
+                    return "Bu dosyalar büyük olasılıkla aynı dosyanın farklı kaydedilmiş versiyonlarıdır. " \
+                           "Feature tree ve geometri yapıları neredeyse aynıdır."
+                elif manip_type == 'Copy-Paste':
+                    return "Bu dosyalar arasında kopyala-yapıştır işlemi tespit edildi. " \
+                           "Feature tree benzerliği yüksek ancak geometri farklılıkları mevcut."
+                elif manip_type == 'Remodeling':
+                    return "Bu dosyalar arasında yeniden modelleme tespit edildi. " \
+                           "Geometri benzerliği yüksek ancak feature tree farklılıkları mevcut."
+                elif manip_type == 'Exact-Copy':
+                    return "Bu dosyalar birebir aynıdır. Tüm özellikler eşleşiyor."
+                else:
+                    return f"Manipülasyon tespit edildi: {manip_type}"
+            else:
+                # Genel değerlendirme
+                if feature_tree > 90 and geometry > 90:
+                    return "Bu dosyalar çok yüksek benzerlik gösteriyor. Aynı modelin varyasyonları olabilir."
+                elif feature_tree > 70 and geometry > 70:
+                    return "Bu dosyalar yüksek benzerlik gösteriyor. Benzer tasarım yaklaşımı kullanılmış."
+                elif feature_tree > 50 and geometry < 50:
+                    return "Feature tree benzerliği var ancak geometri farklı. Aynı şablondan türetilmiş farklı modeller olabilir."
+                elif feature_tree < 50 and geometry > 70:
+                    return "Geometri benzerliği yüksek ancak farklı modelleme yaklaşımı kullanılmış. Benzer fonksiyonel parçalar olabilir."
+                elif feature_tree < 30 and geometry < 30:
+                    return "Bu dosyalar arasında çok düşük benzerlik var. Tamamen farklı modeller."
+                else:
+                    return "Orta seviyede benzerlik gösteren dosyalar. Bazı ortak özellikler mevcut."
+        except Exception as e:
+            logging.error(f"SolidWorks değerlendirme hatası: {e}")
+            return "Değerlendirme yapılamadı."
+
+    def get_memory_usage(self):
+        """Mevcut bellek kullanımını döndürür"""
+        try:
+            import psutil
+            process = psutil.Process()
+            memory_info = process.memory_info()
+            return f"{memory_info.rss / (1024 * 1024):.2f} MB"
+        except ImportError:
+            # psutil yoksa alternatif yöntem
+            import os
+            import platform
+
+            if platform.system() == 'Windows':
+                # Windows için
+                try:
+                    import ctypes
+                    kernel32 = ctypes.windll.kernel32
+                    process_handle = kernel32.GetCurrentProcess()
+                    memory_info = ctypes.c_size_t()
+                    kernel32.GetProcessMemoryInfo(process_handle, ctypes.byref(memory_info), ctypes.sizeof(memory_info))
+                    return f"{memory_info.value / (1024 * 1024):.2f} MB"
+                except:
+                    return "N/A (psutil not available)"
+            else:
+                # Linux için
+                try:
+                    with open(f'/proc/{os.getpid()}/status', 'r') as f:
+                        for line in f:
+                            if 'VmRSS' in line:
+                                return f"{int(line.split()[1]) / 1024:.2f} MB"
+                    return "N/A (psutil not available)"
+                except:
+                    return "N/A (psutil not available)"
 
     def show_help(self):
         """Yardım bilgilerini gösterir."""
@@ -2813,22 +3677,22 @@ def safe_exit():
 
 if __name__ == "__main__":
     try:
-        # Tkinter hata yönetimi için
-        def report_callback_exception(self, exc, val, tb):
-            logging.error(f"Tkinter callback hatası: {val}")
-
-        tk.Tk.report_callback_exception = report_callback_exception
+        setup_logging()
+        logging.info("Uygulama başlatılıyor...")
 
         app = ModernFileComparator()
-        app.protocol("WM_DELETE_WINDOW", app.on_close)  # Pencere kapatıldığında on_close metodunu çağır
-        app.mainloop()
-    except KeyboardInterrupt:
-        print("\nUygulama kullanıcı tarafından durduruldu.")
-        safe_exit()
-    except Exception as e:
-        logging.error(f"Uygulama hatası: {e}")
+
+        # İkon yüklemeyi dene
         try:
-            messagebox.showerror("Kritik Hata", f"Uygulama hatası: {str(e)}")
-        except:
-            print(f"Kritik hata: {str(e)}")
-        safe_exit()
+            if os.path.exists("FileComperator.jpg"):
+                icon = tk.PhotoImage(file="FileComperator.jpg")
+                app.iconphoto(True, icon)
+        except Exception as e:
+            logging.error(f"İkon yükleme hatası: {e}")
+
+        app.mainloop()
+
+    except Exception as e:
+        logging.critical(f"Kritik hata: {e}")
+        messagebox.showerror("Kritik Hata", f"Uygulama hatası: {str(e)}")
+        sys.exit(1)

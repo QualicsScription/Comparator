@@ -1,0 +1,22 @@
+Dosya 1,Dosya 2,Metadata,Hash,İçerik,Yapı,Toplam,Sonuç
+File1.SLDPRT,File1_Copy.SLDPRT,100.0,100.0,0.0,0.0,100.0,Tam Eşleşme
+File1.SLDPRT,File1_MajorChange.SLDPRT,53.6,0.0,0.0,0.0,13.8,Farklı Dosyalar
+File1.SLDPRT,File1_MinorChange.SLDPRT,52.8,0.0,0.0,0.0,14.4,Farklı Dosyalar
+File1.SLDPRT,File1_SaveAs.SLDPRT,53.5,0.0,0.0,0.0,13.7,Farklı Dosyalar
+File1.SLDPRT,File2.SLDPRT,98.0,0.0,0.0,0.0,29.1,Az Benzer
+File1.SLDPRT,File3.SLDPRT,0.0,0.0,0.0,0.0,0.0,Farklı Dosyalar
+File1_Copy.SLDPRT,File1_MajorChange.SLDPRT,53.6,0.0,0.0,0.0,13.8,Farklı Dosyalar
+File1_Copy.SLDPRT,File1_MinorChange.SLDPRT,52.8,0.0,0.0,0.0,14.4,Farklı Dosyalar
+File1_Copy.SLDPRT,File1_SaveAs.SLDPRT,53.5,0.0,0.0,0.0,13.7,Farklı Dosyalar
+File1_Copy.SLDPRT,File2.SLDPRT,98.0,0.0,0.0,0.0,29.1,Az Benzer
+File1_Copy.SLDPRT,File3.SLDPRT,0.0,0.0,0.0,0.0,0.0,Farklı Dosyalar
+File1_MajorChange.SLDPRT,File1_MinorChange.SLDPRT,98.8,0.0,0.0,0.0,23.7,Az Benzer
+File1_MajorChange.SLDPRT,File1_SaveAs.SLDPRT,99.8,0.0,0.0,0.0,23.5,Az Benzer
+File1_MajorChange.SLDPRT,File2.SLDPRT,52.3,0.0,0.0,0.0,14.3,Farklı Dosyalar
+File1_MajorChange.SLDPRT,File3.SLDPRT,0.0,0.0,0.0,0.0,0.0,Farklı Dosyalar
+File1_MinorChange.SLDPRT,File1_SaveAs.SLDPRT,98.9,0.0,0.0,0.0,23.8,Az Benzer
+File1_MinorChange.SLDPRT,File2.SLDPRT,51.5,0.0,0.0,0.0,13.6,Farklı Dosyalar
+File1_MinorChange.SLDPRT,File3.SLDPRT,0.0,0.0,0.0,0.0,0.0,Farklı Dosyalar
+File1_SaveAs.SLDPRT,File2.SLDPRT,52.2,0.0,0.0,0.0,13.8,Farklı Dosyalar
+File1_SaveAs.SLDPRT,File3.SLDPRT,0.0,0.0,0.0,0.0,0.0,Farklı Dosyalar
+File2.SLDPRT,File3.SLDPRT,0.0,0.0,0.0,0.0,0.0,Farklı Dosyalar
