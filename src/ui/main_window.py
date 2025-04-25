@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from ..core.comparator import FileComparator
+from src.core.comparator import FileComparator
 
 class MainWindow(ctk.CTk):
     def __init__(self):

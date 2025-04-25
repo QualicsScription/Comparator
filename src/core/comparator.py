@@ -1,4 +1,4 @@
-from ..utils.helpers import get_file_info, calculate_similarity
+from src.utils.helpers import get_file_info, calculate_similarity
 
 class FileComparator:
     def __init__(self):
