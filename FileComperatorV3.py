@@ -20,11 +20,136 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import customtkinter as ctk
 
+# Logging ayarları
+def setup_logging():
+    """Konsol ve dosya logging ayarlarını yapılandırır"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            # Konsol çıktısı
+            logging.StreamHandler(sys.stdout),
+            # Dosya çıktısı
+            logging.FileHandler('app.log', encoding='utf-8')
+        ]
+    )
+
+# Ana uygulama başlamadan önce logging'i ayarla
+setup_logging()
+
 # Yeni SolidWorks Analyzer'ı içe aktar
 from SolidWorksAnalyzerV4 import SolidWorksAnalyzer
 
 # Uygulama sürümü
 __version__ = "2.0.0"
+
+class MaterialColors:
+    """Material Design renk paleti"""
+    # Ana renkler
+    PRIMARY = "#2196F3"  # Blue 500
+    PRIMARY_LIGHT = "#64B5F6"  # Blue 300
+    PRIMARY_DARK = "#1976D2"  # Blue 700
+
+    # Vurgu renkleri
+    SECONDARY = "#FF4081"  # Pink A200
+    SECONDARY_LIGHT = "#FF80AB"  # Pink A100
+    SECONDARY_DARK = "#F50057"  # Pink A400
+
+    # Arkaplan renkleri
+    BACKGROUND = "#121212"  # Dark theme background
+    SURFACE = "#1E1E1E"  # Dark theme surface
+
+    # Metin renkleri
+    ON_PRIMARY = "#FFFFFF"
+    ON_SECONDARY = "#FFFFFF"
+    ON_BACKGROUND = "#FFFFFF"
+    ON_SURFACE = "#FFFFFF"
+
+    # Durum renkleri
+    SUCCESS = "#4CAF50"  # Green 500
+    ERROR = "#F44336"  # Red 500
+    WARNING = "#FFC107"  # Amber 500
+    INFO = "#2196F3"  # Blue 500
+
+    # Buton durumları
+    BUTTON_NORMAL = PRIMARY
+    BUTTON_HOVER = PRIMARY_LIGHT
+    BUTTON_PRESSED = PRIMARY_DARK
+    BUTTON_DISABLED = "#424242"
+
+class ModernTheme:
+    """Modern tema ayarları"""
+    def __init__(self):
+        self.colors = MaterialColors
+        self.configure_styles()
+
+    def configure_styles(self):
+        """Tüm widget stillerini yapılandır"""
+        # TTK stilleri
+        style = ttk.Style()
+        style.theme_use('clam')  # En uyumlu tema
+
+        # Treeview (tablo) stili
+        style.configure(
+            "Treeview",
+            background=self.colors.SURFACE,
+            foreground=self.colors.ON_SURFACE,
+            fieldbackground=self.colors.SURFACE,
+            borderwidth=0,
+            font=('Segoe UI', 10)
+        )
+
+        style.configure(
+            "Treeview.Heading",
+            background=self.colors.PRIMARY_DARK,
+            foreground=self.colors.ON_PRIMARY,
+            borderwidth=0,
+            font=('Segoe UI', 10, 'bold')
+        )
+
+        # Scrollbar stili
+        style.configure(
+            "Custom.Vertical.TScrollbar",
+            background=self.colors.PRIMARY,
+            troughcolor=self.colors.SURFACE,
+            borderwidth=0,
+            arrowcolor=self.colors.ON_PRIMARY
+        )
+
+        style.configure(
+            "Custom.Horizontal.TScrollbar",
+            background=self.colors.PRIMARY,
+            troughcolor=self.colors.SURFACE,
+            borderwidth=0,
+            arrowcolor=self.colors.ON_PRIMARY
+        )
+
+        # CustomTkinter genel ayarları
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")  # Özel tema yerine şimdilik blue kullanıyoruz
+
+class ModernButton(ctk.CTkButton):
+    """Özel buton sınıfı"""
+    def __init__(self, parent, text, command):
+        super().__init__(
+            master=parent,
+            text=text,
+            command=command,
+            corner_radius=0,
+            border_width=0,
+            fg_color=MaterialColors.BUTTON_NORMAL,
+            hover_color=MaterialColors.BUTTON_HOVER,
+            text_color=MaterialColors.ON_PRIMARY
+        )
+        self.is_active = False
+
+    def set_active(self, active):
+        """Buton aktif durumunu ayarla"""
+        self.is_active = active
+        if active:
+            self.configure(fg_color=MaterialColors.BUTTON_PRESSED)
+        else:
+            self.configure(fg_color=MaterialColors.BUTTON_NORMAL)
 
 # Loglama ayarları
 logging.basicConfig(
@@ -1649,146 +1774,230 @@ class ModernFileComparator(ctk.CTk):
     """Modern arayüzlü dosya karşılaştırma uygulaması."""
 
     def __init__(self):
-        super().__init__()
-
-        # Pencere ayarları
-        self.title(f"Gelişmiş Dosya Karşılaştırıcı v{__version__}")
-        self.geometry("1400x800")
-        self.minsize(1200, 700)
-
-        # Windows görev çubuğunda göstermek için
         try:
-            # İkon dosyası varsa ayarla
-            self.iconbitmap("icon.ico")
-        except:
-            pass
+            super().__init__()
 
-        # Windows başlık çubuğunu gizle
-        self.overrideredirect(True)
+            # Windows başlık çubuğunu kaldır
+            self.overrideredirect(True)
 
-        # Tema ayarları
-        self.setup_theme()
+            # Pencere ayarları
+            self.geometry("1400x800")
+            self.center_window()
 
-        # Pencere kapatma protokolünü ayarla
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
+            # İkon ayarla
+            if os.path.exists("FileComperator.jpg"):
+                try:
+                    icon = tk.PhotoImage(file="FileComperator.jpg")
+                    self.iconphoto(True, icon)
+                except Exception as e:
+                    logging.error(f"İkon yükleme hatası: {e}")
 
-        # After ID'lerini saklamak için liste
-        self.after_ids = []
+            # Tema ayarları
+            self.theme = ModernTheme()
 
-        # Özel başlık çubuğu
-        self.create_custom_title_bar()
+            # Pencere durumu
+            self.is_maximized = False
+            self.old_size = None
+            self.old_position = None
 
-        # Karşılaştırıcı nesnesi
-        self.comparator = FileComparator()
-        self.results = []
-        self.is_running = False
+            # Özel başlık çubuğu
+            self.title_bar = self.create_title_bar()
 
-        # Kullanıcı arayüzü
-        self.setup_ui()
+            # Pencere kapatma protokolünü ayarla
+            self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+            # After ID'lerini saklamak için liste
+            self.after_ids = []
+
+            # Karşılaştırıcı nesnesi
+            self.comparator = FileComparator()
+            self.results = []
+            self.is_running = False
+
+            # Kullanıcı arayüzü
+            self.setup_ui()
+
+            # Buton referanslarını sakla
+            self.start_btn = None
+            self.stop_btn = None
+
+            logging.info("Uygulama başarıyla başlatıldı")
+
+        except Exception as e:
+            logging.error(f"Başlatma hatası: {e}")
+            messagebox.showerror("Kritik Hata", f"Uygulama başlatılamadı: {str(e)}")
+            self.quit()
+
+    def center_window(self):
+        """Pencereyi ekranın ortasına konumlandırır"""
+        try:
+            # Ekran boyutlarını al
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+
+            # Pencere boyutlarını al
+            window_width = 1400  # Varsayılan genişlik
+            window_height = 800  # Varsayılan yükseklik
+
+            # Merkez konumu hesapla
+            x = (screen_width - window_width) // 2
+            y = (screen_height - window_height) // 2
+
+            # Pencereyi konumlandır
+            self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+            logging.info("Pencere ekranın ortasına konumlandırıldı")
+
+        except Exception as e:
+            logging.error(f"Pencere konumlandırma hatası: {e}")
+            # Hata durumunda varsayılan konumu kullan
+            self.geometry("1400x800+100+100")
+
+    def on_error(self, error_msg, title="Hata"):
+        """Hata mesajlarını göster ve logla"""
+        logging.error(error_msg)
+        messagebox.showerror(title, error_msg)
 
         # Pencere boyutlandırma olayları
         self.bind("<Configure>", self.on_resize)
 
-    def create_custom_title_bar(self):
-        """Özel başlık çubuğu oluşturur."""
-        # Başlık çubuğu çerçevesi
-        self.title_bar = ctk.CTkFrame(self, height=30, corner_radius=0)
-        self.title_bar.pack(fill=tk.X)
-        self.title_bar.pack_propagate(False)
+    def create_title_bar(self):
+        """Özel başlık çubuğu oluştur"""
+        title_bar = ctk.CTkFrame(self, fg_color=self.theme.colors.PRIMARY_DARK, height=30)
+        title_bar.pack(fill=tk.X, side=tk.TOP)
 
-        # Başlık etiketi
-        title_label = ctk.CTkLabel(self.title_bar, text=f"Gelişmiş Dosya Karşılaştırıcı v{__version__}")
-        title_label.pack(side=tk.LEFT, padx=10)
+        # Başlık
+        title = ctk.CTkLabel(
+            title_bar,
+            text=f"Gelişmiş Dosya Karşılaştırıcı v{__version__}",
+            text_color=self.theme.colors.ON_PRIMARY
+        )
+        title.pack(side=tk.LEFT, padx=10)
 
         # Pencere kontrol butonları
-        button_frame = ctk.CTkFrame(self.title_bar, fg_color="transparent")
-        button_frame.pack(side=tk.RIGHT)
+        btn_frame = ctk.CTkFrame(title_bar, fg_color="transparent")
+        btn_frame.pack(side=tk.RIGHT, padx=5)
 
-        # Pencere kontrol butonları - Windows stili
-        minimize_btn = ctk.CTkButton(
-            button_frame,
+        # Minimize butonu
+        min_btn = ModernButton(
+            btn_frame,
             text="─",
-            width=30,
-            height=30,
-            fg_color="#1a237e",
-            hover_color="#283593",
+            width=40,
+            height=25,
             command=self.minimize_window
         )
-        minimize_btn.pack(side=tk.LEFT, padx=2)
+        min_btn.pack(side=tk.LEFT, padx=2)
 
-        maximize_btn = ctk.CTkButton(
-            button_frame,
+        # Maximize butonu
+        self.max_btn = ModernButton(
+            btn_frame,
             text="□",
-            width=30,
-            height=30,
-            fg_color="#1a237e",
-            hover_color="#283593",
+            width=40,
+            height=25,
             command=self.toggle_maximize
         )
-        maximize_btn.pack(side=tk.LEFT, padx=2)
+        self.max_btn.pack(side=tk.LEFT, padx=2)
 
-        close_btn = ctk.CTkButton(
-            button_frame,
-            text="✕",
-            width=30,
-            height=30,
-            fg_color="#e81123",  # Windows kırmızı
-            hover_color="#f1707a",
-            command=self.on_close
+        # Kapat butonu
+        close_btn = ModernButton(
+            btn_frame,
+            text="×",
+            width=40,
+            height=25,
+            command=self.on_close,
+            fg_color=self.theme.colors.ERROR,
+            hover_color=self.theme.colors.ERROR
         )
         close_btn.pack(side=tk.LEFT, padx=2)
 
-        # Başlık çubuğunda sürükleme
-        self.title_bar.bind("<ButtonPress-1>", self.start_move)
-        self.title_bar.bind("<ButtonRelease-1>", self.stop_move)
-        self.title_bar.bind("<B1-Motion>", self.on_move)
+        # Pencere sürükleme için event'lar
+        title_bar.bind("<Button-1>", self.start_move)
+        title_bar.bind("<B1-Motion>", self.do_move)
+        title.bind("<Button-1>", self.start_move)
+        title.bind("<B1-Motion>", self.do_move)
 
-        # Çift tıklama ile tam ekran
-        self.title_bar.bind("<Double-1>", lambda e: self.toggle_maximize())
-
-        # Windows görev çubuğunda göstermek için
-        try:
-            self.iconbitmap(default="icon.ico")  # Eğer icon.ico dosyası varsa
-        except:
-            pass  # İkon dosyası yoksa sessizce devam et
+        return title_bar
 
     def minimize_window(self):
         """Pencereyi simge durumuna küçült"""
-        # Windows'ta overrideredirect ile küçültme için
-        self.overrideredirect(False)  # Geçici olarak başlık çubuğunu göster
-        self.iconify()  # Simge durumuna küçült
+        try:
+            self.withdraw()
+            self.overrideredirect(False)
+            self.iconify()
 
-    def show_window(self):
-        """Pencereyi göster"""
-        self.deiconify()
-        self.overrideredirect(True)  # Başlık çubuğunu tekrar gizle
-        self.state('normal')
+            def on_deiconify(event):
+                try:
+                    self.overrideredirect(True)
+                    self.deiconify()
+                    self.bind("<Map>", lambda e: None)
+                except Exception as e:
+                    logging.error(f"Pencere geri yükleme hatası: {e}")
+
+            self.bind("<Map>", on_deiconify)
+            logging.info("Pencere simge durumuna küçültüldü")
+
+        except Exception as e:
+            logging.error(f"Küçültme hatası: {e}")
 
     def toggle_maximize(self):
-        """Pencereyi büyüt/küçült."""
-        if self.state() == 'zoomed':
-            self.state('normal')
-        else:
-            self.state('zoomed')
+        """Tam ekran modunu aç/kapat"""
+        try:
+            if self.is_maximized:
+                self.restore_window()
+                logging.info("Pencere normal boyuta getirildi")
+            else:
+                self.maximize_window()
+                logging.info("Pencere tam ekran yapıldı")
+
+        except Exception as e:
+            logging.error(f"Tam ekran geçiş hatası: {e}")
+
+    def maximize_window(self):
+        """Pencereyi tam ekran yap"""
+        try:
+            self.old_size = self.geometry()
+            self.old_position = (self.winfo_x(), self.winfo_y())
+
+            # Görev çubuğu hariç tam ekran
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight() - 40  # Görev çubuğu için boşluk
+            self.geometry(f"{screen_width}x{screen_height}+0+0")
+
+            self.is_maximized = True
+            self.max_btn.configure(text="❐")
+
+        except Exception as e:
+            logging.error(f"Tam ekran yapma hatası: {e}")
+
+    def restore_window(self):
+        """Pencereyi eski haline getir"""
+        try:
+            if self.old_size:
+                self.geometry(self.old_size)
+                if self.old_position:
+                    self.geometry(f"+{self.old_position[0]}+{self.old_position[1]}")
+
+            self.is_maximized = False
+            self.max_btn.configure(text="□")
+
+        except Exception as e:
+            logging.error(f"Pencere geri yükleme hatası: {e}")
+            # Hata durumunda varsayılan boyuta getir
+            self.geometry("1400x800")
+
+    # Eski toggle_maximize metodu kaldırıldı
 
     def start_move(self, event):
-        """Pencere taşımayı başlat."""
+        """Pencere sürüklemeyi başlat"""
         self.x = event.x
         self.y = event.y
 
-    def stop_move(self, event):
-        """Pencere taşımayı durdur."""
-        self.x = None
-        self.y = None
-
-    def on_move(self, event):
-        """Pencereyi taşı."""
-        if hasattr(self, 'x') and hasattr(self, 'y'):
-            deltax = event.x - self.x
-            deltay = event.y - self.y
-            x = self.winfo_x() + deltax
-            y = self.winfo_y() + deltay
-            self.geometry(f"+{x}+{y}")
+    def do_move(self, event):
+        """Pencereyi sürükle"""
+        deltax = event.x - self.x
+        deltay = event.y - self.y
+        x = self.winfo_x() + deltax
+        y = self.winfo_y() + deltay
+        self.geometry(f"+{x}+{y}")
 
     def on_resize(self, event):
         """Pencere boyutlandırıldığında çağrılır."""
@@ -1800,12 +2009,32 @@ class ModernFileComparator(ctk.CTk):
             pass
 
     def setup_theme(self):
-        """Tema ayarları"""
-        # Dark tema
+        """Tema ayarlarını yapılandırır."""
+        # Ana pencere ayarları
+        self.configure(fg_color=MaterialColors.BACKGROUND)
+
+        # CustomTkinter genel ayarları
         ctk.set_appearance_mode("dark")
 
-        # Tema uygula
-        ctk.set_default_color_theme("blue")  # Özel tema yerine şimdilik blue kullanıyoruz
+        # Tüm frame'ler için
+        for widget in self.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                widget.configure(
+                    fg_color=MaterialColors.SURFACE,
+                    border_width=0,
+                    corner_radius=0
+                )
+
+        # Tüm butonlar için
+        for widget in self.winfo_all_children():
+            if isinstance(widget, ctk.CTkButton):
+                widget.configure(
+                    fg_color=MaterialColors.BUTTON_NORMAL,
+                    hover_color=MaterialColors.BUTTON_HOVER,
+                    text_color=MaterialColors.ON_PRIMARY,
+                    corner_radius=0,
+                    border_width=0
+                )
 
         # Radio butonlar için dark tema
         self.setup_radio_buttons()
@@ -1831,24 +2060,12 @@ class ModernFileComparator(ctk.CTk):
         )
 
     def create_button(self, parent, text, command):
-        """Özel buton oluştur"""
-        btn = ctk.CTkButton(
+        """Modern buton oluştur"""
+        btn = ModernButton(
             parent,
             text=text,
-            command=command,
-            corner_radius=0,
-            border_width=0,
-            fg_color="#1a237e",
-            hover_color="#283593",
-            text_color="white"
+            command=command
         )
-
-        # Tıklama efekti
-        def on_click(event):
-            btn.configure(fg_color="#3949ab")
-            self.after(200, lambda: btn.configure(fg_color="#1a237e"))
-
-        btn.bind("<Button-1>", on_click)
         return btn
 
     def setup_ui(self):
@@ -1891,6 +2108,7 @@ class ModernFileComparator(ctk.CTk):
         # Sonuçlar paneli - dark tema için sekme yazılarını görünür yapma
         self.notebook = ctk.CTkTabview(
             main_frame,
+            fg_color="#1a237e",     # Ana arkaplan rengi
             segmented_button_fg_color="#1a237e",     # Sekme arkaplan rengi
             segmented_button_selected_color="#3949ab", # Seçili sekme rengi
             segmented_button_unselected_color="#1a237e", # Seçili olmayan sekme rengi
@@ -1924,12 +2142,12 @@ class ModernFileComparator(ctk.CTk):
             button_frame.columnconfigure(i, weight=0)
 
         # Başlat butonu
-        start_btn = self.create_button(button_frame, "▶️ Başlat", self.start_comparison)
-        start_btn.grid(row=0, column=1, padx=5)
+        self.start_btn = self.create_button(button_frame, "▶️ Başlat", self.start_comparison)
+        self.start_btn.grid(row=0, column=1, padx=5)
 
         # Durdur butonu
-        stop_btn = self.create_button(button_frame, "⏹ Durdur", self.stop_comparison)
-        stop_btn.grid(row=0, column=2, padx=5)
+        self.stop_btn = self.create_button(button_frame, "⏹ Durdur", self.stop_comparison)
+        self.stop_btn.grid(row=0, column=2, padx=5)
 
         # Temizle butonu
         clear_btn = self.create_button(button_frame, "🗑️ Temizle", self.clear_results)
@@ -1950,66 +2168,147 @@ class ModernFileComparator(ctk.CTk):
 
     def setup_table_view(self):
         """Sonuç tablosunu oluşturur."""
-        style = ttk.Style()
+        # Ana çerçeve
+        self.table_frame = ctk.CTkFrame(self.table_tab, fg_color=MaterialColors.SURFACE)
+        self.table_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Dark tema için tablo stilleri
-        style.configure(
-            "Treeview",
-            background="#2b2b2b",
-            foreground="white",
-            fieldbackground="#2b2b2b",
+        # Canvas ve Scrollbar'lar
+        self.canvas = tk.Canvas(
+            self.table_frame,
+            bg=MaterialColors.SURFACE,
+            highlightthickness=0,
             borderwidth=0
+        )
+
+        # Özel scrollbar'lar
+        self.vsb = ctk.CTkScrollbar(
+            self.table_frame,
+            orientation="vertical",
+            command=self.canvas.yview,
+            fg_color=MaterialColors.SURFACE,
+            button_color=MaterialColors.PRIMARY,
+            button_hover_color=MaterialColors.PRIMARY_LIGHT,
+            width=10
+        )
+
+        self.hsb = ctk.CTkScrollbar(
+            self.table_frame,
+            orientation="horizontal",
+            command=self.canvas.xview,
+            fg_color=MaterialColors.SURFACE,
+            button_color=MaterialColors.PRIMARY,
+            button_hover_color=MaterialColors.PRIMARY_LIGHT,
+            width=10
+        )
+
+        # Tablo stili
+        style = ttk.Style()
+        style.theme_use('clam')
+
+        # Tablo ana stili
+        style.configure(
+            "Custom.Treeview",
+            background=MaterialColors.SURFACE,
+            foreground=MaterialColors.ON_SURFACE,
+            fieldbackground=MaterialColors.SURFACE,
+            borderwidth=0,
+            highlightthickness=0
+        )
+
+        # Tablo başlık stili
+        style.configure(
+            "Custom.Treeview.Heading",
+            background=MaterialColors.PRIMARY_DARK,
+            foreground=MaterialColors.ON_PRIMARY,
+            borderwidth=0,
+            relief="flat"
         )
 
         # Seçili satır stili
-        style.map('Treeview',
-            background=[('selected', '#1a237e')],
-            foreground=[('selected', 'white')]
+        style.map(
+            "Custom.Treeview",
+            background=[("selected", MaterialColors.PRIMARY)],
+            foreground=[("selected", MaterialColors.ON_PRIMARY)]
         )
 
-        # Header stili
-        style.configure(
-            "Treeview.Heading",
-            background="#1a237e",
-            foreground="white",
-            borderwidth=0
+        # Sütunları tanımla
+        self.columns = ('Dosya 1', 'Dosya 2', 'Metadata', 'Hash', 'İçerik', 'Yapı', 'Toplam', 'Sonuç')
+
+        # Tablo oluştur
+        self.tree = ttk.Treeview(
+            self.canvas,
+            style="Custom.Treeview",
+            columns=self.columns,
+            show="headings",
+            selectmode="browse"
         )
 
-        columns = ('Dosya 1', 'Dosya 2', 'Metadata', 'Hash', 'İçerik', 'Yapı', 'Toplam', 'Sonuç')
-        self.tree = ttk.Treeview(self.table_tab, columns=columns, show='headings')
+        # Scrollbar'ları bağla
+        self.canvas.configure(
+            yscrollcommand=self.vsb.set,
+            xscrollcommand=self.hsb.set
+        )
 
-        # Sütun başlıkları
-        for col in columns:
-            self.tree.heading(col, text=col, command=lambda c=col: self.sort_treeview(c))
-            self.tree.column(col, width=100 if col not in ['Dosya 1', 'Dosya 2', 'Sonuç'] else 150)
+        # Yerleşim
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.vsb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.hsb.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Renk etiketleri - dark tema için daha koyu renkler
-        self.tree.tag_configure('high', background='#1a4731')   # Koyu yeşil
-        self.tree.tag_configure('medium', background='#2d4d1a') # Koyu yeşil-sarı
-        self.tree.tag_configure('low', background='#4d3319')    # Koyu turuncu
-        self.tree.tag_configure('none', background='#4d1a1a')   # Koyu kırmızı
+        # Tabloyu canvas'a yerleştir
+        self.canvas.create_window((0, 0), window=self.tree, anchor="nw")
 
-        # Kaydırma çubukları
-        vsb = ttk.Scrollbar(self.table_tab, orient="vertical", command=self.tree.yview)
-        hsb = ttk.Scrollbar(self.table_tab, orient="horizontal", command=self.tree.xview)
-        self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        # Yeniden boyutlandırma olayı
+        def on_configure(event):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+            width = event.width
+            self.canvas.itemconfig(self.canvas.find_all()[0], width=width)
 
-        # Yerleştirme
-        self.tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
+        self.canvas.bind("<Configure>", on_configure)
 
-        self.table_tab.grid_rowconfigure(0, weight=1)
-        self.table_tab.grid_columnconfigure(0, weight=1)
+        # Sütunları ayarla
+        for col in self.columns:
+            self.tree.heading(
+                col,
+                text=col,
+                command=lambda c=col: self.sort_treeview(c)
+            )
+            self.tree.column(
+                col,
+                width=150 if col in ['Dosya 1', 'Dosya 2', 'Sonuç'] else 100
+            )
+
+        # Renk etiketleri
+        self.tree.tag_configure('high', background=MaterialColors.SUCCESS)
+        self.tree.tag_configure('medium', background=MaterialColors.WARNING)
+        self.tree.tag_configure('low', background=MaterialColors.ERROR)
+        self.tree.tag_configure('none', background=MaterialColors.BUTTON_DISABLED)
 
         # Çift tıklama olayı
         self.tree.bind("<Double-1>", self.show_detail_view)
 
     def setup_visual_analysis(self):
         """Görsel analiz panelini oluşturur."""
-        # Ana çerçeve - esnek düzen için
-        visual_frame = ctk.CTkFrame(self.visual_tab)
-        visual_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Ana çerçeve - scroll desteği ile
+        canvas = ctk.CTkCanvas(self.visual_tab, bg="#2b2b2b", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.visual_tab, orient="vertical", command=canvas.yview)
+
+        visual_frame = ctk.CTkFrame(canvas)
+
+        # Scroll için configure
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Pack layout
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Frame'i canvas'a ekle
+        canvas.create_window((0, 0), window=visual_frame, anchor="nw", tags="visual_frame")
+
+        # Scroll için event'lar
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        visual_frame.bind("<Configure>", on_configure)
 
         # Üst kısım için grafik
         graph_frame = ctk.CTkFrame(visual_frame)
@@ -2082,22 +2381,33 @@ class ModernFileComparator(ctk.CTk):
     # on_file_type_change metodu kaldırıldı - otomatik dosya tipi tespiti kullanılıyor
 
     def start_comparison(self):
-        """Karşılaştırma işlemini başlatır."""
-        if self.is_running:
-            return
+        """Karşılaştırma işlemini başlatır"""
+        try:
+            if self.is_running:
+                return
 
-        folder = self.folder_path.get()
-        if not os.path.isdir(folder):
-            messagebox.showerror("Hata", "Geçerli bir klasör seçin!")
-            return
+            # Başlat butonunu aktif yap
+            self.start_btn.set_active(True)
+            self.stop_btn.set_active(False)
 
-        self.is_running = True
-        self.clear_results()
-        self.status_var.set("Dosyalar taranıyor...")
-        self.progress.set(0)
+            folder = self.folder_path.get()
+            if not os.path.isdir(folder):
+                self.on_error("Geçerli bir klasör seçin!")
+                self.start_btn.set_active(False)
+                return
 
-        # Ayrı bir thread'de karşılaştırma başlat
-        threading.Thread(target=self.run_comparison, args=(folder,), daemon=True).start()
+            self.is_running = True
+            self.clear_results()
+            self.status_var.set("Dosyalar taranıyor...")
+            self.progress.set(0)
+
+            threading.Thread(target=self.run_comparison, args=(folder,), daemon=True).start()
+            logging.info(f"Karşılaştırma başlatıldı: {folder}")
+
+        except Exception as e:
+            self.on_error(f"Karşılaştırma başlatılamadı: {str(e)}")
+            self.is_running = False
+            self.start_btn.set_active(False)
 
     def detect_file_type(self, file_path):
         """Dosya tipini otomatik tespit et"""
@@ -2524,9 +2834,16 @@ Değerlendirme:
         self.progress.set(0)
 
     def stop_comparison(self):
-        """Karşılaştırma işlemini durdurur."""
-        self.is_running = False
-        self.status_var.set("İşlem durduruldu!")
+        """Karşılaştırmayı durdur"""
+        try:
+            self.is_running = False
+            self.start_btn.set_active(False)
+            self.stop_btn.set_active(True)
+            self.status_var.set("İşlem durduruldu!")
+            self.after(1000, lambda: self.stop_btn.set_active(False))
+            logging.info("Karşılaştırma durduruldu")
+        except Exception as e:
+            logging.error(f"Durdurma hatası: {e}")
 
     def add_file_info_to_report(self, report, file1, file2):
         """Rapora dosya bilgilerini ekle"""
@@ -2813,22 +3130,32 @@ def safe_exit():
 
 if __name__ == "__main__":
     try:
-        # Tkinter hata yönetimi için
-        def report_callback_exception(self, exc, val, tb):
-            logging.error(f"Tkinter callback hatası: {val}")
+        setup_logging()
+        logging.info("Uygulama başlatılıyor...")
+
+        # Tkinter hata yönetimi
+        def report_callback_exception(exc_type, exc_value, exc_traceback):
+            logging.error(f"Tkinter callback hatası: {exc_value}")
+            messagebox.showerror("Hata", str(exc_value))
 
         tk.Tk.report_callback_exception = report_callback_exception
 
         app = ModernFileComparator()
-        app.protocol("WM_DELETE_WINDOW", app.on_close)  # Pencere kapatıldığında on_close metodunu çağır
+
+        # İkon ayarla
+        if os.path.exists("FileComperator.jpg"):
+            try:
+                icon = tk.PhotoImage(file="FileComperator.jpg")
+                app.iconphoto(True, icon)
+            except Exception as e:
+                logging.error(f"İkon yükleme hatası: {e}")
+
         app.mainloop()
+
     except KeyboardInterrupt:
-        print("\nUygulama kullanıcı tarafından durduruldu.")
-        safe_exit()
+        logging.info("\nUygulama kullanıcı tarafından durduruldu.")
+        sys.exit(0)
     except Exception as e:
-        logging.error(f"Uygulama hatası: {e}")
-        try:
-            messagebox.showerror("Kritik Hata", f"Uygulama hatası: {str(e)}")
-        except:
-            print(f"Kritik hata: {str(e)}")
-        safe_exit()
+        logging.critical(f"Kritik hata: {e}")
+        messagebox.showerror("Kritik Hata", f"Uygulama hatası: {str(e)}")
+        sys.exit(1)

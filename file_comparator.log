@@ -176,3 +176,13 @@
 2025-04-24 16:23:44,926 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
 2025-04-24 16:24:03,774 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
 2025-04-24 16:24:03,793 - ERROR - Dosya yap\u0131s\u0131 kar\u015f\u0131la\u015ft\u0131rma hatas\u0131: [Errno 22] Invalid argument
+2025-04-24 16:29:12,822 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 16:30:02,272 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 16:30:56,510 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 16:33:31,723 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-24 16:34:46,533 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-25 09:24:45,190 - ERROR - Uygulama hatas\u0131: ['segmented_button_text_color', 'segmented_button_selected_text_color'] are not supported arguments. Look at the documentation for supported arguments.
+2025-04-25 09:29:58,482 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-25 09:30:20,275 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
+2025-04-25 09:43:48,074 - ERROR - Uygulama hatas\u0131: '_tkinter.tkapp' object has no attribute 'center_window'
+2025-04-25 10:31:02,752 - ERROR - Kapatma hatas\u0131: can't delete Tcl command
